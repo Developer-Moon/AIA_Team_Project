@@ -11,7 +11,7 @@ from keras.models import Model, load_model
 from tensorflow.keras.utils import to_categorical
 from keras.layers import Input, Dense, LSTM, Embedding, Dropout, add
 
-BASE_DIR = 'D:\study_data\_data\Flickr8k/'
+BASE_DIR = 'D:\study_data\_data/team_project\Flickr8k/'
 WORKING_DIR = 'D:\study_data\_data\Flickr8k/working'
 
 
@@ -326,7 +326,7 @@ def generate_caption(image_name):
     plt.show()
 '''
 
-image = load_img('C:\AIA_Team_Project\Project\img_captioning\india/siberian-husky-g84d30ce80_1280.jpg', target_size=(224, 224))
+image = load_img('D:\study_data\_data/team_project\predict_img/siberian-husky-g84d30ce80_1280.jpg', target_size=(224, 224))
 # convert image pixels to numpy array
 image = img_to_array(image)
 # reshape data for model
