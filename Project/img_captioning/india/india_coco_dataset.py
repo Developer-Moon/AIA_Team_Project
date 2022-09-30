@@ -13,7 +13,7 @@ from tensorflow.keras.utils import to_categorical
 from keras.layers import Input, Dense, LSTM, Embedding, Dropout, add
 
 #================ json 파일 처리 ==================
-num_examples= 50000      # 훈련에 사용할 이미지 개수
+num_examples= 10000      # 훈련에 사용할 이미지 개수
 
 # annotation json 파일 읽기
 with open('D:\study_data\_data/team_project\coco_dataset\json_files/captions_train2014.json', 'r') as f:
