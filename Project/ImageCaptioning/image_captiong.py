@@ -15,13 +15,69 @@ BASE_DIR = 'D:\home_study\Flickr8k_dataset'
 WORKING_DIR = './Working'
 
 
-# # load vgg16 model
-# model = VGG16()
-# # restructure the model
-# model = Model(inputs=model.inputs, outputs=model.layers[-2].output)
-# # summarize
-# # model.summary()
+# load vgg16 model
+model = VGG16()
+# restructure the model
+model = Model(inputs=model.inputs, outputs=model.layers[-2].output)
+# summarize
+# model.summary()
 
+'''
+Model: "model"
+_________________________________________________________________
+ Layer (type)                Output Shape              Param #
+=================================================================
+ input_1 (InputLayer)        [(None, 224, 224, 3)]     0
+
+ block1_conv1 (Conv2D)       (None, 224, 224, 64)      1792
+
+ block1_conv2 (Conv2D)       (None, 224, 224, 64)      36928
+
+ block1_pool (MaxPooling2D)  (None, 112, 112, 64)      0
+
+ block2_conv1 (Conv2D)       (None, 112, 112, 128)     73856
+
+ block2_conv2 (Conv2D)       (None, 112, 112, 128)     147584
+
+ block2_pool (MaxPooling2D)  (None, 56, 56, 128)       0
+
+ block3_conv1 (Conv2D)       (None, 56, 56, 256)       295168
+
+ block3_conv2 (Conv2D)       (None, 56, 56, 256)       590080
+
+ block3_conv3 (Conv2D)       (None, 56, 56, 256)       590080
+
+ block3_pool (MaxPooling2D)  (None, 28, 28, 256)       0
+
+ block4_conv1 (Conv2D)       (None, 28, 28, 512)       1180160
+
+ block4_conv2 (Conv2D)       (None, 28, 28, 512)       2359808
+
+ block4_conv3 (Conv2D)       (None, 28, 28, 512)       2359808
+
+ block4_pool (MaxPooling2D)  (None, 14, 14, 512)       0
+
+ block5_conv1 (Conv2D)       (None, 14, 14, 512)       2359808
+
+ block5_conv2 (Conv2D)       (None, 14, 14, 512)       2359808
+
+ block5_conv3 (Conv2D)       (None, 14, 14, 512)       2359808
+
+ block5_pool (MaxPooling2D)  (None, 7, 7, 512)         0
+
+ flatten (Flatten)           (None, 25088)             0
+
+ fc1 (Dense)                 (None, 4096)              102764544
+
+ fc2 (Dense)                 (None, 4096)              16781312
+
+=================================================================
+Total params: 134,260,544
+Trainable params: 134,260,544
+Non-trainable params: 0
+_________________________________________________________________
+
+'''
 
 # # 이미지의 features 값을 담아줄 딕셔너리 형태 변수 지정
 # features = {}
@@ -215,7 +271,7 @@ split = int(len(image_ids) * 0.90) # train_test_split
 train = image_ids[:] # 안함
 # test = image_ids[split:]
 
-# print(train)
+# print(len(train)) # 8091
 
 # # <start> girl going into wooden building end
 # #        X                   y
@@ -245,11 +301,11 @@ def data_generator(data_keys, mapping, features, tokenizer, max_length, vocab_si
                 # text 문장을 숫자로 이루어진 리스트로 만든다 
                        
                 # split the sequence into X, y pairs
-                for i in range(1, len(seq)):
+                for i in range(1, len(seq)): # 0 은 start라서
                     # split into input and output pairs
                     in_seq, out_seq = seq[:i], seq[i] # 현재 문장을 인풋으로, 다음에 올 단어를 아웃풋으로
                     # pad input sequence
-                    in_seq = pad_sequences([in_seq], maxlen=max_length)[0] # 최대 문장 길이만큼 패딩(0을 앞쪽에 채움)
+                    in_seq = pad_sequences([in_seq], maxlen=max_length)[0] # 최대 문장 길이만큼 패딩(0을 앞쪽에 채움) maxlen 길이제한.
                     # encode output sequence
                     out_seq = to_categorical([out_seq], num_classes=vocab_size)[0] 
                     # 마지막에 소프트맥스값으로 뽑긴 함. 근데 여기서 원핫을 때린다고 원핫밸류가 다르게 찍히는게 이해가 안가는게
@@ -257,7 +313,7 @@ def data_generator(data_keys, mapping, features, tokenizer, max_length, vocab_si
                     
                     # store the sequences
                     X1.append(features[key][0]) # features 에 하나의 key에 해당하는 이미지 피쳐가 리스트로 묶여있기 때문에 인덱스로 부름
-                    X2.append(in_seq)
+                    X2.append(in_seq) 
                     y.append(out_seq)
             if n == batch_size: # 배치 사이즈만큼 차면 yield로 한묶음 채워서 뱉음
                 X1, X2, y = np.array(X1), np.array(X2), np.array(y)
@@ -271,7 +327,7 @@ def data_generator(data_keys, mapping, features, tokenizer, max_length, vocab_si
 # 그러니까 지금 배치 크기일때 마다 해당 함수의 주소에
 # yield1 [X1, X2], y
 # yield2 [X1, X2], y
-# yield3 [X1, X2], y
+# yield3 [X1, X2], yㅋㅋㅋㅋㅋㅋ
 # ...
 # 이런 형태로 리턴되길 대기하는 중인 것
 # while 이 없어도 작동 함
@@ -281,7 +337,7 @@ def data_generator(data_keys, mapping, features, tokenizer, max_length, vocab_si
   
 # encoder model
 # image feature layers
-inputs1 = Input(shape=(4096,))
+inputs1 = Input(shape=(4096,)) # Vgg16 model
 fe1 = Dropout(0.4)(inputs1)
 fe2 = Dense(256, activation='relu')(fe1)
 # sequence feature layers
@@ -319,38 +375,38 @@ print('done training.')
 # save the model
 model.save(WORKING_DIR+'/best_model.h5')
 
-def idx_to_word(integer, tokenizer):
-    for word, index in tokenizer.word_index.items():
+def idx_to_word(integer, tokenizer): 
+    for word, index in tokenizer.word_index.items(): # word_index :: 단어와 숫자, key values 딕셔너리 반환
         if index == integer:
             return word
     return None
 
-# # generate caption for an image
-# def predict_caption(model, image, tokenizer, max_length): # 여기서 image 자리는 vgg 통과해 나온 feature의 자리임
-#     # add start tag for generation process
-#     in_text = 'start' # 빈 문장 생성
-#     # iterate over the max length of sequence
-#     for i in range(max_length):
-#         # encode input sequence
-#         sequence = tokenizer.texts_to_sequences([in_text])[0] # 이거 인덱스 없으면 대괄호 하나 더 있어서 4차원이라 LSTM 이 안먹겠다고 오류남
-#         # pad the sequence
-#         sequence = pad_sequences([sequence], max_length)
-#         # predict next word
-#         yhat = model.predict([image, sequence], verbose=0) # X1 (feature) / X2 (문장)
-#         # get index with high probability
-#         yhat = np.argmax(yhat)
-#         # convert index to word
-#         word = idx_to_word(yhat, tokenizer)
-#         # stop if word not found
-#         if word is None:
-#             break
-#         # append word as input for generating next word
-#         in_text += " " + word
-#         # stop if we reach end tag
-#         if word == 'end':
-#             break
+# generate caption for an image
+def predict_caption(model, image, tokenizer, max_length): # 여기서 image 자리는 vgg 통과해 나온 feature의 자리임
+    # add start tag for generation process
+    in_text = 'start' # 빈 문장 생성
+    # iterate over the max length of sequence
+    for i in range(max_length):
+        # encode input sequence
+        sequence = tokenizer.texts_to_sequences([in_text])[0] # 이거 인덱스 없으면 대괄호 하나 더 있어서 4차원이라 LSTM 이 안먹겠다고 오류남
+        # pad the sequence
+        sequence = pad_sequences([sequence], max_length)
+        # predict next word
+        yhat = model.predict([image, sequence], verbose=0) # X1 (feature) / X2 (문장)
+        # get index with high probability
+        yhat = np.argmax(yhat)
+        # convert index to word
+        word = idx_to_word(yhat, tokenizer)
+        # stop if word not found
+        if word is None:
+            break
+        # append word as input for generating next word
+        in_text += " " + word
+        # stop if we reach end tag
+        if word == 'end':
+            break
       
-#     return in_text
+    return in_text
 
 # ''' bleu score
 # from nltk.translate.bleu_score import corpus_bleu
@@ -394,23 +450,23 @@ def idx_to_word(integer, tokenizer):
 #     plt.show()
 # '''
 
-# image = load_img('D:\AIA_Team_Project\Project\ImageCaptioning/w1.jpg', target_size=(224, 224))
-# # convert image pixels to numpy array
-# image = img_to_array(image)
-# # reshape data for model
-# image = image.reshape((1, image.shape[0], image.shape[1], image.shape[2]))
+image = load_img('D:\AIA_Team_Project\Project\ImageCaptioning/w1.jpg', target_size=(224, 224))
+# convert image pixels to numpy array
+image = img_to_array(image)
+# reshape data for model
+image = image.reshape((1, image.shape[0], image.shape[1], image.shape[2]))
 
-# print('extracting features..')
-# model = VGG16()
-# model = Model(inputs=model.inputs, outputs=model.layers[-2].output)
-# predic_features = model.predict(image, verbose=1)
+print('extracting features..')
+model = VGG16()
+model = Model(inputs=model.inputs, outputs=model.layers[-2].output)
+predic_features = model.predict(image, verbose=1)
 
-# print('prediction..')
-# model = load_model(WORKING_DIR+'/best_model.h5')
-# y_pred = predict_caption(model, predic_features, tokenizer, max_length)
-# y_pred = y_pred.replace('start', '')
-# y_pred = y_pred.replace('end', '')
-# print(y_pred)
+print('prediction..')
+model = load_model(WORKING_DIR+'/best_model.h5')
+y_pred = predict_caption(model, predic_features, tokenizer, max_length)
+y_pred = y_pred.replace('start', '')
+y_pred = y_pred.replace('end', '')
+print(y_pred)
 
 # # generate_caption("1001773457_577c3a7d70.jpg")
 # # generate_caption("1002674143_1b742ab4b8.jpg")
