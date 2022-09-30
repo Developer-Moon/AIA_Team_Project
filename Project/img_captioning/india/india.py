@@ -3,19 +3,21 @@ import pickle
 import numpy as np
 from tqdm.notebook import tqdm
 
-from tensorflow.keras.applications.vgg16 import VGG16, preprocess_input
-from tensorflow.keras.preprocessing.image import load_img, img_to_array
-from tensorflow.keras.preprocessing.text import Tokenizer
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-from tensorflow.keras.models import Model, load_model
-from tensorflow.keras.utils import to_categorical, plot_model
-from tensorflow.keras.layers import Input, Dense, LSTM, Embedding, Dropout, add
+from keras.applications.vgg16 import VGG16, preprocess_input
+# from keras.applications import ResNet101
+from keras.preprocessing.image import load_img, img_to_array
+from keras.preprocessing.text import Tokenizer
+from keras.preprocessing.sequence import pad_sequences
+from keras.models import Model, load_model
+from tensorflow.keras.utils import to_categorical
+from keras.layers import Input, Dense, LSTM, Embedding, Dropout, add
 
 BASE_DIR = 'D:\study_data\_data\Flickr8k/'
 WORKING_DIR = 'D:\study_data\_data\Flickr8k/working'
 '''
 # load vgg16 model
 model = VGG16()
+# model = ResNet101()
 # restructure the model
 model = Model(inputs=model.inputs, outputs=model.layers[-2].output)
 # summarize
@@ -46,7 +48,7 @@ for img_name in tqdm(os.listdir(directory)):
     # store feature
     features[image_id] = feature
     
-print(features)
+# print(features)
 
 # store features in pickle
 pickle.dump(features, open(os.path.join(WORKING_DIR, 'features.pkl'), 'wb'))
@@ -55,12 +57,12 @@ print('img processing done.')
 # load features from pickle
 with open(os.path.join(WORKING_DIR, 'features.pkl'), 'rb') as f:
     features = pickle.load(f)
-    
-    
+
+
 with open(os.path.join(BASE_DIR, 'captions.txt'), 'r') as f:
     next(f)
     captions_doc = f.read()
-    
+
 # create mapping of image to captions
 mapping = {}
 # process lines
@@ -97,7 +99,7 @@ def clean(mapping):
             # delete additional spaces
             caption = caption.replace('\s+', ' ')
             # add start and end tags to the caption
-            caption = 'startseq ' + " ".join([word for word in caption.split() if len(word)>1]) + ' endseq'
+            caption = 'start ' + " ".join([word for word in caption.split() if len(word)>1]) + ' end'
             captions[i] = caption
             
 
@@ -138,13 +140,13 @@ split = int(len(image_ids) * 0.90)
 train = image_ids[:split]
 test = image_ids[split:]
 
-# startseq girl going into wooden building endseq
+# start girl going into wooden building end
 #        X                   y
-# startseq                   girl
-# startseq girl              going
-# startseq girl going        into
+# start                   girl
+# start girl              going
+# start girl going        into
 # ...........
-# startseq girl going into wooden building      endseq
+# start girl going into wooden building      end
 
 
 # create data generator to get data in batch (avoids session crash)
@@ -200,13 +202,9 @@ outputs = Dense(vocab_size, activation='softmax')(decoder2)
 model = Model(inputs=[inputs1, inputs2], outputs=outputs)
 model.compile(loss='categorical_crossentropy', optimizer='adam')
 
-# plot the model
-plot_model(model, show_shapes=True)
-
-
 # train the model
 print('start training...')
-epochs = 10
+epochs = 20
 batch_size = 32
 steps = len(train) // batch_size
 
@@ -215,7 +213,7 @@ for i in range(epochs):
     generator = data_generator(train, mapping, features, tokenizer, max_length, vocab_size, batch_size)
     # fit for one epoch
     model.fit(generator, epochs=1, steps_per_epoch=steps, verbose=1)
-print('done training.')      
+print('done training.')
                 
 # save the model
 model.save(WORKING_DIR+'/best_model.h5')
@@ -230,7 +228,7 @@ def idx_to_word(integer, tokenizer):
 # generate caption for an image
 def predict_caption(model, image, tokenizer, max_length):
     # add start tag for generation process
-    in_text = 'startseq'
+    in_text = 'start'
     # iterate over the max length of sequence
     for i in range(max_length):
         # encode input sequence
@@ -249,7 +247,7 @@ def predict_caption(model, image, tokenizer, max_length):
         # append word as input for generating next word
         in_text += " " + word
         # stop if we reach end tag
-        if word == 'endseq':
+        if word == 'end':
             break
       
     return in_text
@@ -303,6 +301,7 @@ image = img_to_array(image)
 image = image.reshape((1, image.shape[0], image.shape[1], image.shape[2]))
 
 model = VGG16()
+# model = ResNet101()
 # restructure the model
 model = Model(inputs=model.inputs, outputs=model.layers[-2].output)
 predic_feature = model.predict(image, verbose=1)
@@ -314,3 +313,5 @@ print(y_pred)
 # generate_caption("1001773457_577c3a7d70.jpg")
 # generate_caption("1002674143_1b742ab4b8.jpg")
 # generate_caption("101669240_b2d3e7f17b.jpg")
+
+

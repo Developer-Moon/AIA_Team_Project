@@ -14,7 +14,7 @@ from keras.layers import Input, Dense, LSTM, Embedding, Dropout, add
 BASE_DIR = 'D:\study_data\_data/team_project\Flickr8k/'
 WORKING_DIR = 'D:\study_data\_data\Flickr8k/working'
 
-
+'''
 # load vgg16 model
 model = VGG16()
 # restructure the model
@@ -52,6 +52,7 @@ for img_name in tqdm(os.listdir(directory)):
 # store features in pickle
 pickle.dump(features, open(os.path.join(WORKING_DIR, 'features.pkl'), 'wb'))
 print('img processing done.')
+'''
 
 # load features from pickle
 with open(os.path.join(WORKING_DIR, 'features.pkl'), 'rb') as f:
