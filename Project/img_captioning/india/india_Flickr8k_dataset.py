@@ -167,35 +167,35 @@ def data_generator(data_keys, mapping, features, tokenizer, max_length, vocab_si
     # loop over images
     X1, X2, y = list(), list(), list()
     n = 0
-    while 1:
-        for key in data_keys:
-            n += 1
-            captions = mapping[key]
-            # process each caption
-            for caption in captions:
-                # encode the sequence
-                seq = tokenizer.texts_to_sequences([caption])[0] # 리스트 안에 넣고 (한문장씩 들어가 있으니까)
-                                                                 # 첫문장을 토크나이징하는 것으로 해야함
-                # split the sequence into X, y pairs
-                for i in range(1, len(seq)):
-                    # split into input and output pairs
-                    in_seq, out_seq = seq[:i], seq[i] # 현재 문장을 인풋으로, 다음에 올 단어를 아웃풋으로
-                    # pad input sequence
-                    in_seq = pad_sequences([in_seq], maxlen=max_length)[0] # 최대 문장 길이만큼 패딩(0을 앞쪽에 채움)
-                    # encode output sequence
-                    out_seq = to_categorical([out_seq], num_classes=vocab_size)[0] 
-                    # 마지막에 소프트맥스값으로 뽑긴 함. 근데 여기서 원핫을 때린다고 원핫밸류가 다르게 찍히는게 이해가 안가는게
-                    # 여기선 지금 한문장따리만 투카테고리컬에 들어가거든? 그러면 투카테고리컬이 이전 밸류들을 다 기억을 하고 있다는 소린거 같은데 그런가봄
-                    
-                    # store the sequences
-                    X1.append(features[key][0]) # features 에 하나의 key에 해당하는 이미지 피쳐가 리스트로 묶여있기 때문에 인덱스로 부름
-                    X2.append(in_seq)
-                    y.append(out_seq)
-            if n == batch_size: # 배치 사이즈만큼 차면 yield로 한묶음 채워서 뱉음
-                X1, X2, y = np.array(X1), np.array(X2), np.array(y)
-                yield [X1, X2], y
-                X1, X2, y = list(), list(), list()
-                n = 0
+
+    for key in data_keys:
+        n += 1
+        captions = mapping[key]
+        # process each caption
+        for caption in captions:
+            # encode the sequence
+            seq = tokenizer.texts_to_sequences([caption])[0] # 리스트 안에 넣고 (한문장씩 들어가 있으니까)
+                                                                # 첫문장을 토크나이징하는 것으로 해야함
+            # split the sequence into X, y pairs
+            for i in range(1, len(seq)):
+                # split into input and output pairs
+                in_seq, out_seq = seq[:i], seq[i] # 현재 문장을 인풋으로, 다음에 올 단어를 아웃풋으로
+                # pad input sequence
+                in_seq = pad_sequences([in_seq], maxlen=max_length)[0] # 최대 문장 길이만큼 패딩(0을 앞쪽에 채움)
+                # encode output sequence
+                out_seq = to_categorical([out_seq], num_classes=vocab_size)[0] 
+                # 마지막에 소프트맥스값으로 뽑긴 함. 근데 여기서 원핫을 때린다고 원핫밸류가 다르게 찍히는게 이해가 안가는게
+                # 여기선 지금 한문장따리만 투카테고리컬에 들어가거든? 그러면 투카테고리컬이 이전 밸류들을 다 기억을 하고 있다는 소린거 같은데 그런가봄
+                
+                # store the sequences
+                X1.append(features[key][0]) # features 에 하나의 key에 해당하는 이미지 피쳐가 리스트로 묶여있기 때문에 인덱스로 부름
+                X2.append(in_seq)
+                y.append(out_seq)
+        if n == batch_size: # 배치 사이즈만큼 차면 yield로 한묶음 채워서 뱉음
+            X1, X2, y = np.array(X1), np.array(X2), np.array(y)
+            yield [X1, X2], y
+            X1, X2, y = list(), list(), list()
+            n = 0
 
 # yield 는 해당 함수가 반복문을 통해 실행 될때마다 차례대로 값을 뱉도록 해준다
 # 즉 현재 함수 내에서 while문으로 생성된 yield는 제너레이터형식 주소 안에 차곡차곡 쌓이게 되고

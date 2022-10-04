@@ -149,7 +149,6 @@ image_ids = list(mapping.keys())
 # split = int(len(image_ids) * 0.90)
 train = image_ids[:] # 안함
 # test = image_ids[split:]
-# validation 세트 따로 있긴한데 솔직히 귀찮잖아? ㅋ
 #================================
 
 

@@ -13,7 +13,7 @@ from tensorflow.keras.utils import to_categorical
 from keras.layers import Input, Dense, LSTM, Embedding, Dropout, add
 '''
 #================ json 파일 처리 ==================
-num_examples= 5000     # 훈련에 사용할 이미지 개수
+num_examples= 10000     # 훈련에 사용할 이미지 개수
 
 # annotation json 파일 읽기
 with open('D:\study_data\_data/team_project\coco_dataset\json_files/captions_train2014.json', 'r') as f:
@@ -32,7 +32,7 @@ for annot in annotations['annotations']:
   all_captions.append(caption)
 
 # caption과 image name들을 섞습니다.(shuffle)
-train_captions, img_name_vector = shuffle(all_captions, all_img_name_vector, random_state=1)
+train_captions, img_name_vector = shuffle(all_captions, all_img_name_vector, random_state=13)
 
 # 빠른 학습을 위해서 shuffle된 set에서 처음부터 시작해서 num_examples 개수만큼만 선택합니다.
 train_captions = train_captions[:num_examples]
@@ -41,7 +41,7 @@ img_name_vector = img_name_vector[:num_examples]
 print('train_captions :', len(train_captions))
 print('all_captions :', len(all_captions))
 
-pickle.dump(train_captions, open(os.path.join('D:\study_data\_data/team_project\coco_dataset\img_features', 'train_captions2.pkl'), 'wb'))
+pickle.dump(train_captions, open(os.path.join('D:\study_data\_data/team_project\coco_dataset\img_features', 'train_captions10000.pkl'), 'wb'))
 
 # print(train_captions[:1])
 # print(img_name_vector[:1])
@@ -81,7 +81,7 @@ for img_path in img_name_vector:
     
 
 # store features in pickle
-pickle.dump(features, open(os.path.join('D:\study_data\_data/team_project\coco_dataset\img_features', 'features2.pkl'), 'wb'))
+pickle.dump(features, open(os.path.join('D:\study_data\_data/team_project\coco_dataset\img_features', 'features10000.pkl'), 'wb'))
 print('img processing done.')
 
 
@@ -90,11 +90,11 @@ print('img processing done.')
 '''
 
 # features 파일 불러오기
-with open(os.path.join('D:\study_data\_data/team_project\coco_dataset\img_features/', 'features2.pkl'), 'rb') as f:
+with open(os.path.join('D:\study_data\_data/team_project\coco_dataset\img_features/', 'features10000.pkl'), 'rb') as f:
   features = pickle.load(f)
 
 #================ 캡션 파일 전처리 ====================
-with open(os.path.join('D:\study_data\_data/team_project\coco_dataset\img_features/', 'train_captions2.pkl'), 'rb') as f:
+with open(os.path.join('D:\study_data\_data/team_project\coco_dataset\img_features/', 'train_captions10000.pkl'), 'rb') as f:
   captions = pickle.load(f)
 
 print(len(features))
@@ -133,9 +133,8 @@ train_img = features[:split]
 test_img = features[split:]
 #================================
 
-print(train_cap[0])
-print(train_img[0])
-
+# print(train_cap[0])
+# print(train_img[0])
 
 # create data generator to get data in batch (avoids session crash)
 def data_generator(features, captions, tokenizer, max_length, vocab_size, batch_size):
@@ -161,9 +160,10 @@ def data_generator(features, captions, tokenizer, max_length, vocab_size, batch_
       y.append(out_seq)
       
     if n == batch_size: # 배치 사이즈만큼 차면 yield로 한묶음 채워서 뱉음
-        X1, X2, y = np.array(X1), np.array(X2), np.array(y)
-        yield [X1, X2], y
-        X1, X2, y = list(), list(), list()
+      X1, X2, y = np.array(X1), np.array(X2), np.array(y)
+      yield [X1, X2], y
+      X1, X2, y = list(), list(), list()
+      n = 0
 
 
 # encoder model
@@ -188,7 +188,7 @@ model.compile(loss='categorical_crossentropy', optimizer='adam')
 # train the model
 print('start training...')
 epochs = 50
-batch_size = 225
+batch_size = 50
 steps = len(train_cap) // batch_size # 1 batch 당 훈련하는 데이터 수
 
 # 제너레이터 함수에서 yield로 252개의 [X1, X2], y 묶음이 차곡차곡 쌓여 있고  steps_per_epoch=steps 이 옵션으로
@@ -273,3 +273,6 @@ print(y_pred)
 
 # 70에포 64배치
 # a man is sitting on a motorcycle with a usa flag
+
+# 20에포 128배치
+# a man riding a motorcycle on a leather motorcycle 
