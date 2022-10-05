@@ -7,13 +7,14 @@ from sklearn.utils import shuffle
 from tensorflow.keras.applications.vgg16 import VGG16, preprocess_input
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.applications import InceptionV3
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.layers import Input, Dense, LSTM, Embedding, Dropout, add
 
 #================ json 파일 처리 ==================
-num_examples= 60000     # 훈련에 사용할 이미지 개수
+num_examples= 30000     # 훈련에 사용할 이미지 개수
 
 # annotation json 파일 읽기
 with open('D:\home_study/annotations/captions_train2014.json', 'r') as f:
@@ -53,9 +54,9 @@ pickle.dump(train_captions, open(os.path.join('D:\AIA_Team_Project\COCO_features
 
 #================ 이미지 파일 전처리 (feature extraction) ====================
 # load vgg16 model
-model = VGG16()
+model = InceptionV3()
 # restructure the model
-model = Model(inputs=model.inputs, outputs=model.layers[-2].output)
+model = Model(inputs=model.inputs, outputs=model.layers[-1].output)
 # model.summary()
 
 # extract features from image
@@ -63,7 +64,7 @@ features = []
 
 for img_path in img_name_vector:
   # load the image from file
-  image = load_img(img_path, target_size=(224, 224))
+  image = load_img(img_path, target_size=(299, 299))
   # convert image pixels to numpy array
   image = img_to_array(image)
   # reshape data for model
@@ -81,7 +82,7 @@ for img_path in img_name_vector:
     
 
 # store features in pickle
-pickle.dump(features, open(os.path.join('D:\AIA_Team_Project\COCO_features', 'img_features.pkl'), 'wb'))
+pickle.dump(features, open(os.path.join('D:\AIA_Team_Project\COCO_features', 'inception_img_features.pkl'), 'wb'))
 print('img processing done.')
 
 
@@ -90,7 +91,7 @@ print('img processing done.')
 
 
 # features 파일 불러오기
-with open(os.path.join('D:\AIA_Team_Project\COCO_features/', 'img_features.pkl'), 'rb') as f:
+with open(os.path.join('D:\AIA_Team_Project\COCO_features/', 'inception_img_features.pkl'), 'rb') as f:
   features = pickle.load(f)
 
 #================ 캡션 파일 전처리 ====================
@@ -168,7 +169,7 @@ def data_generator(features, captions, tokenizer, max_length, vocab_size, batch_
 
 # encoder model
 # image feature layers
-inputs1 = Input(shape=(4096,))
+inputs1 = Input(shape=(1000,))
 fe1 = Dropout(0.4)(inputs1)
 fe2 = Dense(256, activation='relu')(fe1)
 # sequence feature layers
@@ -187,7 +188,7 @@ model.compile(loss='categorical_crossentropy', optimizer='adam')
 
 # train the model
 print('start training...')
-epochs = 50
+epochs = 2
 batch_size = 50
 steps = len(train_cap) // batch_size # 1 batch 당 훈련하는 데이터 수
 
@@ -203,8 +204,8 @@ for i in range(epochs):
 print('done training.')
 
 # save the model
-model.save('D:\AIA_Team_Project\_save/best_model2.h5')
-print('model saved.')
+# model.save('D:\AIA_Team_Project\_save/best_model.h5')
+# print('model saved.')
 
 
 def idx_to_word(integer, tokenizer):
@@ -240,19 +241,19 @@ def predict_caption(model, image, tokenizer, max_length): # 여기서 image 자�
       
   return in_text
 
-image = load_img('D:\AIA_Team_Project\Project\ImageCaptioning\w1.jpg', target_size=(224, 224))
+image = load_img('D:\AIA_Team_Project\Project\ImageCaptioning\w1.jpg', target_size=(229, 229))
 # convert image pixels to numpy array
 image = img_to_array(image)
 # reshape data for model
 image = image.reshape((1, image.shape[0], image.shape[1], image.shape[2]))
 
 print('extracting features..')
-model = VGG16()
+model = InceptionV3()
 model = Model(inputs=model.inputs, outputs=model.layers[-2].output)
 predic_features = model.predict(image, verbose=1)
 
 print('prediction..')
-model = load_model('D:\AIA_Team_Project\_save/best_model2.h5')
+# model = load_model('D:\AIA_Team_Project\_save/best_model2.h5')
 y_pred = predict_caption(model, predic_features, tokenizer, max_length)
 y_pred = y_pred.replace('startseq', '')
 y_pred = y_pred.replace('endseq', '')

@@ -136,49 +136,44 @@ test_img = features[split:]
 # print(train_cap[0])
 # print(train_img[0])
 
-# create data generator to get data in batch (avoids session crash)
 def data_generator(features, captions, tokenizer, max_length, vocab_size, batch_size):
-  # loop over images
   X1, X2, y = list(), list(), list()
   n = 0
   for idx, caption in enumerate(captions):
     n += 1
-    # encode the sequence
     seq = tokenizer.texts_to_sequences([caption])[0]
-    # split the sequence into X, y pairs
     for i in range(1, len(seq)):
-      # split into input and output pairs
-      in_seq, out_seq = seq[:i], seq[i] # 현재 문장을 인풋으로, 다음에 올 단어를 아웃풋으로
-      # pad input sequence
-      in_seq = pad_sequences([in_seq], maxlen=max_length)[0] # 최대 문장 길이만큼 패딩(0을 앞쪽에 채움)
-      # encode output sequence
+      in_seq, out_seq = seq[:i], seq[i]
+      in_seq = pad_sequences([in_seq], maxlen=max_length)[0]
       out_seq = to_categorical([out_seq], num_classes=vocab_size)[0]
-      
-      # store the sequences
+
       X1.append(features[idx][0])
       X2.append(in_seq)
       y.append(out_seq)
       
-    if n == batch_size: # 배치 사이즈만큼 차면 yield로 한묶음 채워서 뱉음
+    if n == batch_size: 
       X1, X2, y = np.array(X1), np.array(X2), np.array(y)
       yield [X1, X2], y
       X1, X2, y = list(), list(), list()
       n = 0
 
-
-# encoder model
 # image feature layers
 inputs1 = Input(shape=(4096,))
 fe1 = Dropout(0.4)(inputs1)
-fe2 = Dense(256, activation='relu')(fe1)
+fe2 = Dense(64, activation='relu')(fe1)
+fe3 = Dense(128, activation='relu')(fe2)
+fe4 = Dense(128, activation='relu')(fe3)
+fe5 = Dense(256, activation='relu')(fe4)
 # sequence feature layers
 inputs2 = Input(shape=(max_length,))
 se1 = Embedding(vocab_size, 256, mask_zero=True)(inputs2)
 se2 = Dropout(0.4)(se1)
-se3 = LSTM(256)(se2)
+se3 = Dense(128, activation='relu')(se2)
+se4 = Dense(128, activation='relu')(se3)
+se5 = LSTM(256)(se4)
 
 # decoder model
-decoder1 = add([fe2, se3])
+decoder1 = add([fe5, se5])
 decoder2 = Dense(256, activation='relu')(decoder1)
 outputs = Dense(vocab_size, activation='softmax')(decoder2)
 
@@ -200,11 +195,12 @@ for i in range(epochs):
   generator = data_generator(train_img, train_cap, tokenizer, max_length, vocab_size, batch_size)
   # fit for one epoch
   model.fit(generator, epochs=1, steps_per_epoch=steps, verbose=1) # generator -> [X1, X2], y
-print('done training.')
+print('done training.') 
 
 # save the model
 model.save('D:\AIA_Team_Project\_save/best_model2.h5')
 print('model saved.')
+
 
 
 def idx_to_word(integer, tokenizer):
@@ -239,6 +235,31 @@ def predict_caption(model, image, tokenizer, max_length): # 여기서 image 자�
         break
       
   return in_text
+
+
+# Bleu 스코어 뽑아보기
+
+from nltk.translate.bleu_score import corpus_bleu
+from tqdm.notebook import tqdm
+
+actual, predicted = list(), list()
+
+for key in tqdm(test_cap):
+    # get actual caption
+    captions = captions[key]
+    # predict the caption for image
+    y_pred = predict_caption(model, features[key], tokenizer, max_length) 
+    # split into words
+    actual_captions = [caption.split() for caption in captions]
+    y_pred = y_pred.split()
+    # append to the list
+    actual.append(actual_captions)
+    predicted.append(y_pred)
+
+# print("BLEU-1: %f" % corpus_bleu(actual, predicted, weights=(1.0, 0, 0, 0)))        # 1-gram 만 뽑음
+# print("BLEU-2: %f" % corpus_bleu(actual, predicted, weights=(0.5, 0.5, 0, 0)))      # 1-gram 과 2-gram 만 뽑되 각각 같은 가중치를 두고 뽑음
+
+
 
 image = load_img('D:\AIA_Team_Project\Project\ImageCaptioning\w1.jpg', target_size=(224, 224))
 # convert image pixels to numpy array
