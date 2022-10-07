@@ -259,7 +259,26 @@ y_pred = y_pred.replace('endseq', '')
 print(y_pred)
 
 
-# bleu 스코어 따로 안뽑았음
+# bleu 스코어
+from nltk.translate.bleu_score import corpus_bleu
+# validate with test data
+actual, predicted = list(), list()
+
+for idx, caption in enumerate(test_cap):
+    # predict the caption for image
+    y_pred = predict_caption(model, test_img[idx], tokenizer, max_length) 
+    # split into words
+    actual_captions = [caption.split() for caption in captions]
+    y_pred = y_pred.split()
+    # append to the list
+    actual.append(actual_captions)
+    predicted.append(y_pred)
+    
+# calcuate BLEU score
+print("BLEU-1: %f" % corpus_bleu(actual, predicted, weights=(1.0, 0, 0, 0)))      
+print("BLEU-2: %f" % corpus_bleu(actual, predicted, weights=(0.5, 0.5, 0, 0))) 
+
+
 
 # a white polar bear offering a picture of a polar bear
 
