@@ -55,8 +55,8 @@ pickle.dump(train_captions, open(os.path.join('D:\AIA_Team_Project\COCO_features
 # load vgg16 model
 model = VGG16()
 # restructure the model
-model = Model(inputs=model.inputs, outputs=model.layers[-2].output)
-# model.summary()
+model = Model(inputs=model.inputs, outputs=model.layers[-1].output)
+model.summary()
 
 # extract features from image
 features = []

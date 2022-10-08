@@ -16,79 +16,69 @@ from keras.applications import ResNet101, ResNet50
 BASE_DIR = 'D:\home_study\Flickr8k_dataset'
 WORKING_DIR = './Working'
 
-
-# load vgg16 model
-# model = ResNet101()
 model = VGG16()
-# restructure the model
 model = Model(inputs=model.inputs, outputs=model.layers[-1].output)
-# summarize
 # model.summary()
 
 # 이미지의 features 값을 담아줄 딕셔너리 형태 변수 지정
-features = {}
-directory = os.path.join(BASE_DIR, 'Images')
+# features = {}
+# directory = os.path.join(BASE_DIR, 'Images')
 
-# print(os.listdir(directory))
-
-# # 이미지의 features 값을 부여하는 for문 
-
-for img_name in tqdm(os.listdir(directory)): # 해당 이미지 폴더의 이미지리스트에서 하나씩 작업
-    # load the image from file
-    img_path = directory + '/' + img_name # 각 이미지마다 이미지명으로 경로 지정
-    # print(img_path) D:\home_study\Flickr8k_dataset\Images/1000268201_693b08cb0e.jpg
-    image = load_img(img_path, target_size=(224, 224)) # 각 이미지를 불러와서 사이즈 지정후 imgae 변수에 담기
-    # convert image pixels to numpy array
-    image = img_to_array(image) # image 를 numpy 배열로 변환하는 작업
-    # print(image)
-    # reshape data for model
-    image = image.reshape((1, image.shape[0], image.shape[1], image.shape[2])) # 변환된 값을 reshape 해준다
-    # preprocess image for vgg
-    # print(np.max(image), np.min(image)) # 각 픽셀 채널 범위 0 ~ 255 (원본 이미지 포멧)
-    image = preprocess_input(image)
-    # print(np.max(image), np.min(image)) # 각 픽셀 채널 범위 -151 ~ 151 (이미지넷 대회에서 사용하는 이미지 포맷)
-    # print(image)
-    # extract features
-    feature = model.predict(image, verbose=1) # image를 vgg16으로 predict
-    # print(feature)
-    # get image ID
-    image_id = img_name.split('.')[0] # 파일명 뒤에 .jpg 확장자 잘라내기
-    # store feature
-    features[image_id] = feature # 해당 이미지 고유의 predict 값
-    
-    
-# print(features['1000268201_693b08cb0e'])
-
-# store features in pickle
-pickle.dump(features, open(os.path.join(WORKING_DIR, 'features.pkl'), 'wb'))
-print('img processing done.')
+# # 이미지의 features 값을 추출
+# for img_name in tqdm(os.listdir(directory)): # 해당 이미지 폴더의 이미지리스트에서 하나씩 작업
+#     img_path = directory + '/' + img_name # 각 이미지마다 이미지명으로 경로 지정
+#     # print(img_path) D:\study\Flickr8k_dataset\Images/1000268201_693b08cb0e.jpg
+#     image = load_img(img_path, target_size=(224, 224)) 
+#     # 각 이미지를 불러와서 사이즈 지정후 imgae 변수에 담기
+#     image = img_to_array(image) 
+#     # image 를 numpy 배열로 변환하는 작업
+#     image = image.reshape((1, image.shape[0], image.shape[1], image.shape[2])) 
+#     # 변환된 값을 4차원으로 reshape
+#     # print(np.max(image), np.min(image)) # 각 픽셀 채널 범위 0 ~ 255 (원본 이미지 포멧)
+#     image = preprocess_input(image)
+#     # print(np.max(image), np.min(image)) # 각 픽셀 채널 범위 -151 ~ 151 (이미지넷 대회에서 사용하는 이미지 포맷)
+#     feature = model.predict(image, verbose=1) 
+#     # image를 vgg16으로 predict하여 features값 추출
+#     # get image ID
+#     image_id = img_name.split('.')[0]
+     
+#     features[image_id] = feature 
+#     # 해당 이미지 고유의 features 값 매핑
+ 
+# # store features in pickle
+# pickle.dump(features, open(os.path.join(WORKING_DIR, 'features.pkl'), 'wb'))
+# print('img processing done.')
 
 # load features from pickle
 with open(os.path.join(WORKING_DIR, 'features.pkl'), 'rb') as f:
     features = pickle.load(f)
+ 
+# print(features['1000268201_693b08cb0e'])
+# print(features)
+    
+# print(np.max(features['1000268201_693b08cb0e']))
+# print(np.min(features['1000268201_693b08cb0e']))
     
     
 with open(os.path.join(BASE_DIR, 'captions.txt'), 'r') as f:
-    next(f) # 첫줄 빼고 읽어오기 (첫번째 행 무시)
+    next(f)
     captions_doc = f.read()
-
 # print(captions_doc)
-
-# create mapping of image to captions
 
 # 이미지와 캡션을 매핑하여 딕셔너리형태로 담기
 mapping = {}
 # process lines
 for line in tqdm(captions_doc.split('\n')): # enter 기준으로 잘라내서 line으로 담으며 시작
-    # split the line by comma(,)
-    tokens = line.split(',') # 현재 이미지명.jpg , caption text 가 붙어있어서 , 기준으로 잘라내는것(구분)
-    
-    if len(line) < 1: # 0 단어짜리 스킵용도. caption.txt 파일 맨마지막에 빈문장자리가 있어서 그거 걸러내는 용도
-        continue
-    
-    # tokens에 담긴 image와 caption을 가져온다
-    # print(tokens)
+    print(line, 1)
+    # print(line, 1)
+    tokens = line.split(',') 
+    print(tokens)  
+        
+    if len(line) < 1: 
+        continue   
+
     image_id, caption = tokens[0], tokens[1:] #  0번째만가져옴, 1부터 끝까지 가져옴
+    # print(caption)
     # remove extension from image ID
     # print(image_id, caption) 1000268201_693b08cb0e.jpg ['A child in a pink dress is climbing up a set of stairs in an entry way .']
     image_id = image_id.split('.')[0] # . 이후 지움 (확장자 삭제)
@@ -307,12 +297,14 @@ fe2 = Dense(256, activation='relu')(fe1)
 inputs2 = Input(shape=(max_length,))
 se1 = Embedding(vocab_size, 256, mask_zero=True)(inputs2)
 se2 = Dropout(0.4)(se1)
-se3 = LSTM(256)(se2)
+se3 = Dense(256)(se2)
+# se3 = LSTM(256)(se2)
 
 # decoder model
 decoder1 = add([fe2, se3])
-decoder2 = Dense(256, activation='relu')(decoder1)
-outputs = Dense(vocab_size, activation='softmax')(decoder2)  
+decoder2 = LSTM(256)(decoder1)
+decoder3 = Dense(256, activation='relu')(decoder2)
+outputs = Dense(vocab_size, activation='softmax')(decoder3)  
 
 model = Model(inputs=[inputs1, inputs2], outputs=outputs)
 model.compile(loss='categorical_crossentropy', optimizer='adam')
