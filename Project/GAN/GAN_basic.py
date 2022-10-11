@@ -26,11 +26,6 @@ image_size = 784
 num_epochs = 20
 batch_size = 100
 
-# Create a directory if not exists
-if not os.path.exists(sample_dir):
-    os.makedirs(sample_dir)
-
-
 # 랜덤하게 이미지 9장 살펴보는 함수
 def show_imgs(dataset):
     figure = plt.figure(figsize=(8, 8))

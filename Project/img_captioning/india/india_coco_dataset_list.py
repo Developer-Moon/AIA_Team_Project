@@ -91,11 +91,11 @@ print('img processing done.')
 '''
 
 # features 파일 불러오기
-with open(os.path.join('D:\study_data\_data/team_project\coco_dataset\img_features/', 'res101_features10000.pkl'), 'rb') as f:
+with open(os.path.join('D:\study_data\_data/team_project\coco_dataset\img_features/', 'res101_features80000.pkl'), 'rb') as f:
   features = pickle.load(f)
 
 #================ 캡션 파일 전처리 ====================
-with open(os.path.join('D:\study_data\_data/team_project\coco_dataset\img_features/', 'res101_train_captions10000.pkl'), 'rb') as f:
+with open(os.path.join('D:\study_data\_data/team_project\coco_dataset\img_features/', 'res101_train_captions80000.pkl'), 'rb') as f:
   captions = pickle.load(f)
 
 print(len(features))
@@ -206,7 +206,7 @@ for i in range(epochs):
 print('done training.')
 
 # save the model
-model.save('D:\study_data\_data/team_project\coco_dataset\model_save/res101_model3_10000.h5')
+model.save('D:\study_data\_data/team_project\coco_dataset\model_save/res101_model3_80000.h5')
 print('model saved.')
 '''
 
@@ -243,7 +243,7 @@ def predict_caption(model, image, tokenizer, max_length): # 여기서 image 자�
       
   return in_text
 
-image = load_img('D:\study_data\_data/team_project\predict_img/street-g27099b4c0_1280.jpg', target_size=(224, 224))
+image = load_img('D:\study_data\_data/team_project\predict_img/03.jpg', target_size=(224, 224))
 # convert image pixels to numpy array
 image = img_to_array(image)
 # reshape data for model
@@ -255,7 +255,7 @@ model = Model(inputs=model.inputs, outputs=model.layers[-1].output)
 predic_features = model.predict(image, verbose=1)
 
 print('prediction..')
-model = load_model('D:\study_data\_data/team_project\coco_dataset\model_save/res101_model3_10000.h5')
+model = load_model('D:\study_data\_data/team_project\coco_dataset\model_save/res101_model3_80000.h5')
 y_pred = predict_caption(model, predic_features, tokenizer, max_length)
 y_pred = y_pred.replace('startseq', '')
 y_pred = y_pred.replace('endseq', '')
