@@ -25,27 +25,20 @@ model = Model(inputs=model.inputs, outputs=model.layers[-1].output)
 # directory = os.path.join(BASE_DIR, 'Images')
 
 # # 이미지의 features 값을 추출
-# for img_name in tqdm(os.listdir(directory)): # 해당 이미지 폴더의 이미지리스트에서 하나씩 작업
-#     img_path = directory + '/' + img_name # 각 이미지마다 이미지명으로 경로 지정
-#     # print(img_path) D:\study\Flickr8k_dataset\Images/1000268201_693b08cb0e.jpg
+# for img_name in tqdm(os.listdir(directory)): 
+#     img_path = directory + '/' + img_name 
 #     image = load_img(img_path, target_size=(224, 224)) 
-#     # 각 이미지를 불러와서 사이즈 지정후 imgae 변수에 담기
 #     image = img_to_array(image) 
-#     # image 를 numpy 배열로 변환하는 작업
 #     image = image.reshape((1, image.shape[0], image.shape[1], image.shape[2])) 
-#     # 변환된 값을 4차원으로 reshape
-#     # print(np.max(image), np.min(image)) # 각 픽셀 채널 범위 0 ~ 255 (원본 이미지 포멧)
+#     # print(np.max(image), np.min(image)) # 각 픽셀 채널 범위 0 ~ 255 
 #     image = preprocess_input(image)
-#     # print(np.max(image), np.min(image)) # 각 픽셀 채널 범위 -151 ~ 151 (이미지넷 대회에서 사용하는 이미지 포맷)
+#     # print(np.max(image), np.min(image)) # 각 픽셀 채널 범위 -151 ~ 151
 #     feature = model.predict(image, verbose=1) 
-#     # image를 vgg16으로 predict하여 features값 추출
-#     # get image ID
 #     image_id = img_name.split('.')[0]
      
 #     features[image_id] = feature 
 #     # 해당 이미지 고유의 features 값 매핑
- 
-# # store features in pickle
+
 # pickle.dump(features, open(os.path.join(WORKING_DIR, 'features.pkl'), 'wb'))
 # print('img processing done.')
 
@@ -63,39 +56,28 @@ with open(os.path.join(WORKING_DIR, 'features.pkl'), 'rb') as f:
 with open(os.path.join(BASE_DIR, 'captions.txt'), 'r') as f:
     next(f)
     captions_doc = f.read()
-# print(captions_doc)
 
 # 이미지와 캡션을 매핑하여 딕셔너리형태로 담기
 mapping = {}
-# process lines
-for line in tqdm(captions_doc.split('\n')): # enter 기준으로 잘라내서 line으로 담으며 시작
-    print(line, 1)
-    # print(line, 1)
+for line in tqdm(captions_doc.split('\n')):
     tokens = line.split(',') 
-    print(tokens)  
         
     if len(line) < 1: 
         continue   
+    image_id, caption = tokens[0], tokens[1:]
 
-    image_id, caption = tokens[0], tokens[1:] #  0번째만가져옴, 1부터 끝까지 가져옴
-    # print(caption)
-    # remove extension from image ID
-    # print(image_id, caption) 1000268201_693b08cb0e.jpg ['A child in a pink dress is climbing up a set of stairs in an entry way .']
-    image_id = image_id.split('.')[0] # . 이후 지움 (확장자 삭제)
-    # convert caption list to string
-    # print(caption)
+    image_id = image_id.split('.')[0] 
     caption = "".join(caption)
     '''['A rock climber practices on a rock climbing wall .']
             A rock climber practices on a rock climbing wall .'''
-    # print(caption)
-    
-    # create list if needed
-    if image_id not in mapping: # key 값으로 mapping 딕셔너리 안에 현재 image_id가 없으면
-        mapping[image_id] = []  # image_id:[] 형태로 새로 딕셔너리 자리 하나 만듦
-    # store the caption
-    mapping[image_id].append(caption) # 만든 자리에 현재 캡션 넣음
-                                      # 해당 이미지 id가 이미 있으면 그 자리에 넣음
-                                      # 한 이미지당 5개이므로 다음 이미지 아이디가 들어오기 전까지 한자리에 넣음
+
+    if image_id not in mapping: 
+        mapping[image_id] = []  
+
+    mapping[image_id].append(caption) 
+    # 만든 자리에 현재 캡션 넣음
+    # 해당 이미지 id가 이미 있으면 그 자리에 넣음
+    # 한 이미지당 5개이므로 다음 이미지 아이디가 들어오기 전까지 한자리에 넣음
 
 # 현재 mapping 안에는 이미지 id 와 해당하는 caption이 함께 key, value 로 들어가져있는상태.
 
@@ -115,58 +97,45 @@ for line in tqdm(captions_doc.split('\n')): # enter 기준으로 잘라내서 li
 
 # '''
 
-# NLP 정제 및 정규화
-# 정제, 정규화, 불용어, 소문자변환작업, 불필요한 단어의 제거
-
 def clean(mapping): # 맵핑 딕셔너리 안의 caption을 전처리
     for key, captions in mapping.items():
         for i in range(len(captions)):
-            # take one caption at a time
             caption = captions[i]
-            # preprocessing steps
-            # convert to lowercase
             caption = caption.lower()
-            # delete digits, special chars, etc.
-            caption = caption.replace('[^A-Za-z]', '')# [A-Z] [a-z] : 각각 대문자 알파벳, 소문자 알파벳 모두를 의미
-            # delete additional spaces
-            caption = caption.replace('\s+', ' ') # [ \t\n\r\f\v] 가 1번 이상 나오면 공백으로 변경
-            # add start and end tags to the caption
-            
+            caption = caption.replace('[^A-Za-z]', '')
+
+            caption = caption.replace('\s+', ' ') 
+            # [ \t\n\r\f\v] 가 1번 이상 나오면 공백으로 변경
             caption = 'start ' + caption + ' end'
-            # 스페이스 기준 잘라서 넣기
-            '''a child is standing on her head .
-            start a child is standing on her head end .'''
             captions[i] = caption.replace(' .', '') # 마침표 제거
-            
 
 # # before preprocess of text
 # # print('bf_text:', mapping['1001773457_577c3a7d70'])
 
-# # '''
-# # caption 전처리 전 
-# # bf_text: ['A child in a pink dress is climbing up a set of stairs in an entry way .', 
-# # 'A girl going into a wooden building .', 
-# # 'A little girl climbing into a wooden playhouse .', 
-# # 'A little girl climbing the stairs to her playhouse .', 
-# # 'A little girl in a pink dress going into a wooden cabin .']
+# '''
+# caption 전처리 전 
+# bf_text: ['A child in a pink dress is climbing up a set of stairs in an entry way .', 
+# 'A girl going into a wooden building .', 
+# 'A little girl climbing into a wooden playhouse .', 
+# 'A little girl climbing the stairs to her playhouse .', 
+# 'A little girl in a pink dress going into a wooden cabin .'
+# '''
 
-# # '''
-
-# # preprocess the text
+# preprocess the text
 # clean(mapping)
 
-# # after preprocess of text
-# # print('af_text:', mapping['1001773457_577c3a7d70'])
+# after preprocess of text
+# print('af_text:', mapping['1001773457_577c3a7d70'])
 
-# # '''
-# # caption 전처리 후 
-# # 특문제거, start end join, 
-# # af_text: ['start a black dog and a spotted dog are fighting end', 
-# # 'start a black dog and a tri-colored dog playing with each other on the road end', 
-# # 'start a black dog and a white dog with brown spots are staring at each other in the street end', 
-# # 'start two dogs of different breeds looking at each other on the road end', 
-# # 'start two dogs on pavement moving toward each other end']
-# # '''
+# '''
+# caption 전처리 후 
+# 특문제거, start end join, 
+# af_text: ['start a black dog and a spotted dog are fighting end', 
+# 'start a black dog and a tri-colored dog playing with each other on the road end', 
+# 'start a black dog and a white dog with brown spots are staring at each other in the street end', 
+# 'start two dogs of different breeds looking at each other on the road end', 
+# 'start two dogs on pavement moving toward each other end']
+# '''
 
 # # # 딕셔너리에서 캡션만 뽑아오기
 all_captions = []
@@ -219,6 +188,8 @@ print('max_len:', max_length) # max_len: 38 # max_length
 
 
 image_ids = list(mapping.keys())
+print(list(mapping.values()))
+# print(image_ids[0])
 split = int(len(image_ids) * 0.90) # train_test_split
 train = image_ids[:] # 안함
 # test = image_ids[split:]
