@@ -5,6 +5,8 @@ import json
 
 from sklearn.utils import shuffle
 from keras.applications.vgg16 import VGG16, preprocess_input
+from keras.applications.vgg19 import VGG19
+from keras.applications.resnet import ResNet50, ResNet101
 from keras.preprocessing.image import load_img, img_to_array
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
@@ -13,7 +15,7 @@ from tensorflow.keras.utils import to_categorical
 from keras.layers import Input, Dense, LSTM, Embedding, Dropout, add
 '''
 #================ json 파일 처리 ==================
-num_examples= 10000     # 훈련에 사용할 이미지 개수
+num_examples= 80000     # 훈련에 사용할 이미지 개수
 
 # annotation json 파일 읽기
 with open('D:\study_data\_data/team_project\coco_dataset\json_files/captions_train2014.json', 'r') as f:
@@ -41,8 +43,7 @@ img_name_vector = img_name_vector[:num_examples]
 print('train_captions :', len(train_captions))
 print('all_captions :', len(all_captions))
 
-pickle.dump(train_captions, open(os.path.join('D:\study_data\_data/team_project\coco_dataset\img_features', 'train_captions10000.pkl'), 'wb'))
-
+pickle.dump(train_captions, open(os.path.join('D:\study_data\_data/team_project\coco_dataset\img_features', 'res101_train_captions80000.pkl'), 'wb'))
 # print(train_captions[:1])
 # print(img_name_vector[:1])
 # ['startseq A skateboarder performing a trick on a skateboard ramp. endseq']
@@ -53,9 +54,9 @@ pickle.dump(train_captions, open(os.path.join('D:\study_data\_data/team_project\
 
 #================ 이미지 파일 전처리 (feature extraction) ====================
 # load vgg16 model
-model = VGG16()
+model = ResNet101()
 # restructure the model
-model = Model(inputs=model.inputs, outputs=model.layers[-2].output)
+model = Model(inputs=model.inputs, outputs=model.layers[-1].output)
 # model.summary()
 
 # extract features from image
@@ -81,7 +82,7 @@ for img_path in img_name_vector:
     
 
 # store features in pickle
-pickle.dump(features, open(os.path.join('D:\study_data\_data/team_project\coco_dataset\img_features', 'features10000.pkl'), 'wb'))
+pickle.dump(features, open(os.path.join('D:\study_data\_data/team_project\coco_dataset\img_features', 'res101_features80000.pkl'), 'wb'))
 print('img processing done.')
 
 
@@ -90,11 +91,11 @@ print('img processing done.')
 '''
 
 # features 파일 불러오기
-with open(os.path.join('D:\study_data\_data/team_project\coco_dataset\img_features/', 'features10000.pkl'), 'rb') as f:
+with open(os.path.join('D:\study_data\_data/team_project\coco_dataset\img_features/', 'res101_features10000.pkl'), 'rb') as f:
   features = pickle.load(f)
 
 #================ 캡션 파일 전처리 ====================
-with open(os.path.join('D:\study_data\_data/team_project\coco_dataset\img_features/', 'train_captions10000.pkl'), 'rb') as f:
+with open(os.path.join('D:\study_data\_data/team_project\coco_dataset\img_features/', 'res101_train_captions10000.pkl'), 'rb') as f:
   captions = pickle.load(f)
 
 print(len(features))
@@ -168,26 +169,28 @@ def data_generator(features, captions, tokenizer, max_length, vocab_size, batch_
 
 # encoder model
 # image feature layers
-inputs1 = Input(shape=(4096,))
+inputs1 = Input(shape=(1000,))
 fe1 = Dropout(0.4)(inputs1)
 fe2 = Dense(256, activation='relu')(fe1)
 # sequence feature layers
 inputs2 = Input(shape=(max_length,))
 se1 = Embedding(vocab_size, 256, mask_zero=True)(inputs2)
 se2 = Dropout(0.4)(se1)
-se3 = LSTM(256)(se2)
+se3 = Dense(256)(se2)
 
 # decoder model
 decoder1 = add([fe2, se3])
-decoder2 = Dense(256, activation='relu')(decoder1)
-outputs = Dense(vocab_size, activation='softmax')(decoder2)
+decoder2 = LSTM(256)(decoder1)
+decoder3 = Dense(256, activation='relu')(decoder2)
+outputs = Dense(vocab_size, activation='softmax')(decoder3)
 
 model = Model(inputs=[inputs1, inputs2], outputs=outputs)
 model.compile(loss='categorical_crossentropy', optimizer='adam')
 
+'''
 # train the model
 print('start training...')
-epochs = 50
+epochs = 40
 batch_size = 50
 steps = len(train_cap) // batch_size # 1 batch 당 훈련하는 데이터 수
 
@@ -203,9 +206,9 @@ for i in range(epochs):
 print('done training.')
 
 # save the model
-model.save('D:\study_data\_data/team_project\coco_dataset\model_save/best_model2.h5')
+model.save('D:\study_data\_data/team_project\coco_dataset\model_save/res101_model3_10000.h5')
 print('model saved.')
-
+'''
 
 def idx_to_word(integer, tokenizer):
   for word, index in tokenizer.word_index.items():
@@ -247,12 +250,12 @@ image = img_to_array(image)
 image = image.reshape((1, image.shape[0], image.shape[1], image.shape[2]))
 
 print('extracting features..')
-model = VGG16()
-model = Model(inputs=model.inputs, outputs=model.layers[-2].output)
+model = ResNet101()
+model = Model(inputs=model.inputs, outputs=model.layers[-1].output)
 predic_features = model.predict(image, verbose=1)
 
 print('prediction..')
-model = load_model('D:\study_data\_data/team_project\coco_dataset\model_save/best_model2.h5')
+model = load_model('D:\study_data\_data/team_project\coco_dataset\model_save/res101_model3_10000.h5')
 y_pred = predict_caption(model, predic_features, tokenizer, max_length)
 y_pred = y_pred.replace('startseq', '')
 y_pred = y_pred.replace('endseq', '')
@@ -265,15 +268,16 @@ from nltk.translate.bleu_score import corpus_bleu
 actual, predicted = list(), list()
 
 for idx, caption in enumerate(test_cap):
-    # predict the caption for image
-    y_pred = predict_caption(model, test_img[idx], tokenizer, max_length) 
-    # split into words
-    actual_captions = [caption.split() for caption in captions]
-    y_pred = y_pred.split()
-    # append to the list
-    actual.append(actual_captions)
-    predicted.append(y_pred)
-    
+  # print('verbose for bleu:', idx)
+  # predict the caption for image
+  y_pred = predict_caption(model, test_img[idx], tokenizer, max_length) 
+  # split into words
+  actual_captions = [caption.split() for caption in captions]
+  y_pred = y_pred.split()
+  # append to the list
+  actual.append(actual_captions)
+  predicted.append(y_pred)
+
 # calcuate BLEU score
 print("BLEU-1: %f" % corpus_bleu(actual, predicted, weights=(1.0, 0, 0, 0)))      
 print("BLEU-2: %f" % corpus_bleu(actual, predicted, weights=(0.5, 0.5, 0, 0))) 
@@ -295,3 +299,15 @@ print("BLEU-2: %f" % corpus_bleu(actual, predicted, weights=(0.5, 0.5, 0, 0)))
 
 # 20에포 128배치
 # a man riding a motorcycle on a leather motorcycle 
+
+# 5에포 50배치
+# a man riding a motorcycle on a motorcycle with a helmet
+
+# 40에포 50배치 1만장 vgg16
+# a man rides a motor motorcycle on a street
+# BLEU-1: 0.978604
+# BLEU-2: 0.938410
+
+# 40에포 50배치 1만장 vgg19
+# a brightly colored clock stands in front of a building
+# BLEU-1: 0.980556
