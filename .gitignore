@@ -3,3 +3,5 @@ Working/features.pkl
 Working/features_vgg19.pkl
 _save/
 COCO_features/
+.data/
+transformer_german_to_english.pt
