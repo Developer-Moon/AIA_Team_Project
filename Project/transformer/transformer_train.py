@@ -8,9 +8,13 @@ import random
 
 import spacy
 import en_core_web_sm
+from nltk.tokenize import word_tokenize
 
-spacy_en = en_core_web_sm.load() # 영어 토큰화(tokenization)
-spacy_de = spacy.load('de_core_news_sm') # 독일어 토큰화(tokenization)
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+spacy_en = en_core_web_sm.load() # 영어 toknizer
+spacy_de = spacy.load('de_core_news_sm') # 독일어 toknizer
+
 
 '''
 # 간단히 토큰화(tokenization) 기능 써보기
@@ -19,20 +23,26 @@ tokenized = spacy_en.tokenizer("I am a graduate student.")
 for i, token in enumerate(tokenized):
     print(f"인덱스 {i}: {token.text}")
 '''
- 
+
 # 독일어(Deutsch) 문장을 토큰화 하는 함수 (순서를 뒤집지 않음)
-def tokenize_de(text):
-    return [token.text for token in spacy_de.tokenizer(text)]
+# def tokenize_de(text):
+#     return [token.text for token in spacy_de.tokenizer(text)]
+
+def tokenize_de(text): # 단어단위 일반 토크나이저 사용 해보기
+    return [token for token in word_tokenize(text)]
 
 # 영어(English) 문장을 토큰화 하는 함수
-def tokenize_en(text):
-    return [token.text for token in spacy_en.tokenizer(text)]
+# def tokenize_en(text):
+#     return [token.text for token in spacy_en.tokenizer(text)]
+
+def tokenize_en(text): # 단어단위 일반 토크나이저 사용 해보기
+    return [token for token in word_tokenize(text)]
 
 from torchtext.data import Field, BucketIterator
 
 SRC = Field(tokenize=tokenize_de, init_token="<sos>", eos_token="<eos>", lower=True, batch_first=True)
 TRG = Field(tokenize=tokenize_en, init_token="<sos>", eos_token="<eos>", lower=True, batch_first=True)
-# 트랜스포머에서는 보통 시퀀스보다 batch를 첫차원에 넣음
+# batch가 첫번째 차원
 
 from torchtext.datasets import Multi30k # 단어풀 쉽게 다운받아 사용 가능
 
@@ -47,7 +57,7 @@ print(f"테스트 데이터셋(testing dataset) 크기: {len(test_dataset.exampl
 print(vars(train_dataset.examples[30])['src'])
 print(vars(train_dataset.examples[30])['trg'])
 '''
-
+# 최소 두번 이상 등장한 단어에 대해서만 vcab 에 추가함
 SRC.build_vocab(train_dataset, min_freq=2)
 TRG.build_vocab(train_dataset, min_freq=2)
 
@@ -64,17 +74,15 @@ print(TRG.vocab.stoi["hello"])
 print(TRG.vocab.stoi["world"])
 '''
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 BATCH_SIZE = 128
 
-# 일반적인 데이터 로더(data loader)의 iterator와 유사하게 사용 가능
+# BucketIterator : 일반적인 dataloader 기능이 있는데 이 dataloader를 만들 때 batch별로 비슷한 길이의 문장끼리 묶도록 함으로써 패딩을 최소화
 train_iterator, valid_iterator, test_iterator = BucketIterator.splits(
     (train_dataset, valid_dataset, test_dataset),
-    batch_size=BATCH_SIZE,
+    batch_size=BATCH_SIZE, shuffle=False,
     device=device)
 
-for i, batch in enumerate(train_iterator):
+for idx, batch in enumerate(train_iterator):
     src = batch.src
     trg = batch.trg
 
@@ -82,10 +90,9 @@ for i, batch in enumerate(train_iterator):
 
     # 현재 배치에 있는 하나의 문장에 포함된 정보 출력
     for i in range(src.shape[1]):
-        print(f"인덱스 {i}: {src[0][i].item()}") # 여기에서는 [Seq_num, Seq_len]
+        print(f"인덱스 {i}: {src[idx][i].item()}")
 
-    # 첫 번째 배치만 확인
-    break
+    break  # 첫번째 배치만 확인
 
 
 class MultiHeadAttentionLayer(nn.Module):
@@ -93,7 +100,10 @@ class MultiHeadAttentionLayer(nn.Module):
         super().__init__()
 
         assert hidden_dim % n_heads == 0
-        # 짝수만 디멘션으로 사용 가능하도록 함
+        # hidden_dim 이 n_heads로 나누어 떨어져야만 함. 그래야 n_head x head_dim = hidden_dim
+        # n_head : 어텐션 헤드 개수
+        # head_dim : 각 헤드의 임베딩 디멘션
+        # hidden_dim : 모든 어텐션의 디멘션, 임베딩 차원
 
         self.hidden_dim = hidden_dim # 임베딩 차원
         self.n_heads = n_heads # 헤드(head)의 개수: 서로 다른 어텐션(attention) 컨셉의 수
@@ -103,7 +113,7 @@ class MultiHeadAttentionLayer(nn.Module):
         self.fc_k = nn.Linear(hidden_dim, hidden_dim) # Key 값에 적용될 FC 레이어
         self.fc_v = nn.Linear(hidden_dim, hidden_dim) # Value 값에 적용될 FC 레이어
 
-        self.fc_o = nn.Linear(hidden_dim, hidden_dim)
+        self.fc_o = nn.Linear(hidden_dim, hidden_dim) # 임베딩 디멘션, 원래 모양, 피드포워드
 
         self.dropout = nn.Dropout(dropout_ratio)
 
@@ -130,6 +140,7 @@ class MultiHeadAttentionLayer(nn.Module):
         Q = Q.view(batch_size, -1, self.n_heads, self.head_dim).permute(0, 2, 1, 3)
         K = K.view(batch_size, -1, self.n_heads, self.head_dim).permute(0, 2, 1, 3)
         V = V.view(batch_size, -1, self.n_heads, self.head_dim).permute(0, 2, 1, 3)
+        # permute(): 다차원 행렬전치에 사용. transpose()는 permute()의 두개만 쓰는 버전임
 
         # Q: [batch_size, n_heads, query_len, head_dim]
         # K: [batch_size, n_heads, key_len, head_dim]
@@ -137,21 +148,28 @@ class MultiHeadAttentionLayer(nn.Module):
 
         # Attention Energy 계산
         energy = torch.matmul(Q, K.permute(0, 1, 3, 2)) / self.scale
-        # permute(): 다차원 행렬전치에 사용. transpose()는 permute()의 두개만 쓰는 버전임
 
         # energy: [batch_size, n_heads, query_len, key_len]
 
         # 마스크(mask)를 사용하는 경우
         if mask is not None:
-            # 마스크(mask) 값이 0인 부분을 -1e10으로 채우기 - softmax 이후 0%가 되도록
             energy = energy.masked_fill(mask==0, -1e10)
-
+        # 마스크(mask) 값이 0인 부분을 -1e10으로 채우기 - softmax 이후 0%가 되도록
+        # 마스크 벡터는 trg_pad_mask 에 저장시켜 사용하는데
+        """ (마스크 예시)
+        1 0 0 0 0
+        1 1 0 0 0
+        1 1 1 0 0
+        1 1 1 1 0
+        1 1 1 1 1
+        """
+        # 이 모양으로 되어있음
+        
         # 어텐션(attention) 스코어 계산: 각 단어에 대한 확률 값
         attention = torch.softmax(energy, dim=-1)
+        # attention: [batch_size, n_heads, query_len, key_len]   query_len = key_len
 
-        # attention: [batch_size, n_heads, query_len, key_len]
-
-        # 여기에서 Scaled Dot-Product Attention을 계산 - attention value 값
+        # 여기에서 Scaled Dot-Product Attention을 계산 = attention value 값
         x = torch.matmul(self.dropout(attention), V)
 
         # x: [batch_size, n_heads, query_len, head_dim]
@@ -165,11 +183,11 @@ class MultiHeadAttentionLayer(nn.Module):
         x = x.view(batch_size, -1, self.hidden_dim)
         # view(): 토치에서 이 함수는 다차원 행렬을 저차원 행렬로 변환해줌
 
-        # x: [batch_size, query_len, hidden_dim] << 변경되는 부분 참고
+        # x: [batch_size, query_len, hidden_dim] << 변경되는 부분 참고     n_heads x head_dim = hidden_dim
         # 이 모양은 처음에 넣었던 각 키, 쿼리, 밸류 모양과 동일함
 
         x = self.fc_o(x)
-        # 원래 모양만든거 가지고 리니어 한번 통과해서 weight값 곱해준 것
+        # 원래 모양만든거 가지고 리니어 한번 통과해서 weight값 곱해준 것 - feedforward network 부분
 
         # x: [batch_size, query_len, hidden_dim]
 
@@ -197,7 +215,8 @@ class PositionwiseFeedforwardLayer(nn.Module):
 
         # x: [batch_size, seq_len, hidden_dim]
         
-        # 걍 렐루한번, 리니어한번 때려 나감
+        # 걍 렐루한번, 리니어한번 때려 나감. 포지션 벡터 차원을 하나 정해주고 그 벡터에 맞춰서 각 값의 자리별로 서로 다른 값을 갖도록 한 후
+        # 다시 원래 모양으로 되돌려 나감. 그러면 각 자리의 값들에는 위치벡터값을 간직하고 있는 채로 모양만 원래 모양으로 변경됨
 
         return x
 
@@ -220,7 +239,7 @@ class EncoderLayer(nn.Module):
         # self attention
         # 필요한 경우 마스크(mask) 행렬을 이용하여 어텐션(attention)할 단어를 조절 가능
         _src, _ = self.self_attention(src, src, src, src_mask)
-        # self-attention 이므로 src 에는 복제된 키, 쿼리, 밸류
+        # self-attention 이므로 _src 에는 src키, src쿼리, src밸류
 
         # dropout, residual connection and layer norm
         src = self.self_attn_layer_norm(src + self.dropout(_src))
@@ -248,7 +267,7 @@ class Encoder(nn.Module): # 앞의 EncoderLayer를 총 n개의 레이어만큼 �
 
         self.device = device
 
-        self.tok_embedding = nn.Embedding(input_dim, hidden_dim) # 들어온 것에 대한 임베딩 (토큰화)
+        self.tok_embedding = nn.Embedding(input_dim, hidden_dim) # 들어온 것에 대한 임베딩 (밀집벡터화)
         self.pos_embedding = nn.Embedding(max_length, hidden_dim) # 전체에 대한 임베딩 (위치값 기억테이블 생성)
     
 
@@ -269,22 +288,28 @@ class Encoder(nn.Module): # 앞의 EncoderLayer를 총 n개의 레이어만큼 �
         src_len = src.shape[1] # 각 문장 중 단어가 제일 많은 문장의 단어 개수 (최대길이)
 
         pos = torch.arange(0, src_len).unsqueeze(0).repeat(batch_size, 1).to(self.device)
-        # arange(0, src_len): 0 부터 src_len 까지 실수범위
-        # unsqueeze(0): 한차원 늘리고 (벡터형태니까) -> (1, src_len)
-        # repeat(batch_size, 1): dim=0으로 batch_size만큼 반복, dim=1로 1만큼 반복 -> (batch_size, src_len)
+        '''>>> torch.arange(5)
+        tensor([ 0,  1,  2,  3,  4])
+        >>> torch.arange(1, 4)
+        tensor([ 1,  2,  3])
+        >>> torch.arange(1, 2.5, 0.5)
+        tensor([ 1.0000,  1.5000,  2.0000])'''
+        # 1. arange(0, src_len): 0 부터 src_len 까지 실수범위
+        # 2. unsqueeze(0): 0번째에 한차원 늘림 (벡터형태니까) -> (1, src_len)
+        # 3. repeat(batch_size, 1): dim=0으로 batch_size만큼 반복, dim=1로 1만큼 반복 -> (batch_size, src_len)
         
         # pos: [batch_size, src_len]
 
         # 소스 문장의 임베딩과 위치 임베딩을 더한 것을 사용
         src = self.dropout((self.tok_embedding(src) * self.scale) + self.pos_embedding(pos))
-
-        # src: [batch_size, src_len, hidden_dim]
+        # src: [batch_size, src_len, hidden_dim]  각 문장들이 밀집벡터형태로 배치개수만큼 묶여 있음
 
         # 모든 인코더 레이어를 차례대로 거치면서 순전파(forward) 수행
         for layer in self.layers:
             src = layer(src, src_mask)
         # 실질적으로 레이어 통과 진행시키는 부분
-
+        # 모듈 리스트로 n개만큼 쌓은 인코더 레이어에 src를 하나씩 통과시키도록 선언해둠
+        
         # src: [batch_size, src_len, hidden_dim]
 
         return src # 마지막 레이어의 출력을 반환
@@ -317,13 +342,13 @@ class DecoderLayer(nn.Module):
 
         # dropout, residual connection and layer norm
         trg = self.self_attn_layer_norm(trg + self.dropout(_trg))
-
+        
         # trg: [batch_size, trg_len, hidden_dim]
 
         # encoder attention
         # 디코더의 쿼리(Query)를 이용해 인코더를 어텐션(attention)
         _trg, attention = self.encoder_attention(trg, enc_src, enc_src, src_mask)
-        #  자신의 쿼리, 인코더의 키, 인코더의 밸류
+        #  자신(디코더)의 쿼리, 인코더의 키, 인코더의 밸류
         
         # dropout, residual connection and layer norm
         trg = self.enc_attn_layer_norm(trg + self.dropout(_trg))
@@ -489,7 +514,7 @@ class Transformer(nn.Module):
         enc_src = self.encoder(src, src_mask)
 
         # enc_src: [batch_size, src_len, hidden_dim]
-
+        
         output, attention = self.decoder(trg, enc_src, trg_mask, src_mask)
 
         # output: [batch_size, trg_len, output_dim]
