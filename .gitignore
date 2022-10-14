@@ -6,3 +6,4 @@
 *.json
 *.pyc
 .data
+models
