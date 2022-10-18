@@ -712,7 +712,7 @@ def display_attention(sentence, translation, attention, n_heads=8, n_rows=4, n_c
     
 example_idx = 10
 # src = vars(test_dataset.examples[example_idx])['src']
-src = tokenize_de('Zwei Hunde spielen im Schnee.')
+src = tokenize_de('Mädchen, die mit Hunden spazieren gehen')
 # 모델 출력 결과: two dogs play in the snow . <eos>
 
 # trg = vars(test_dataset.examples[example_idx])['trg']
