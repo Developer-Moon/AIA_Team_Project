@@ -47,7 +47,7 @@ TRG = Field(tokenize=tokenize_en, init_token="<sos>", eos_token="<eos>", lower=T
 from torchtext.datasets import Multi30k # 단어풀 쉽게 다운받아 사용 가능
 
 train_dataset, valid_dataset, test_dataset = Multi30k.splits(exts=(".de", ".en"), fields=(SRC, TRG))
-
+    
 print(f"학습 데이터셋(training dataset) 크기: {len(train_dataset.examples)}개")
 print(f"평가 데이터셋(validation dataset) 크기: {len(valid_dataset.examples)}개")
 print(f"테스트 데이터셋(testing dataset) 크기: {len(test_dataset.examples)}개")
@@ -57,6 +57,7 @@ print(f"테스트 데이터셋(testing dataset) 크기: {len(test_dataset.exampl
 print(vars(train_dataset.examples[30])['src'])
 print(vars(train_dataset.examples[30])['trg'])
 '''
+
 # 최소 두번 이상 등장한 단어에 대해서만 vcab 에 추가함
 SRC.build_vocab(train_dataset, min_freq=2)
 TRG.build_vocab(train_dataset, min_freq=2)
@@ -77,6 +78,7 @@ print(TRG.vocab.stoi["world"])
 BATCH_SIZE = 128
 
 # BucketIterator : 일반적인 dataloader 기능이 있는데 이 dataloader를 만들 때 batch별로 비슷한 길이의 문장끼리 묶도록 함으로써 패딩을 최소화
+# 토큰화 + 각 배치별 최대길이에 맞춰 패딩작업
 train_iterator, valid_iterator, test_iterator = BucketIterator.splits(
     (train_dataset, valid_dataset, test_dataset),
     batch_size=BATCH_SIZE, shuffle=False,
@@ -151,7 +153,7 @@ class MultiHeadAttentionLayer(nn.Module):
 
         # energy: [batch_size, n_heads, query_len, key_len]
 
-        # 마스크(mask)를 사용하는 경우
+        # 마스크(mask)를 사용하는 경우, encoder에서도 사용하는 이유는 여기서는 0이 없는 단어, 1이 패딩이라 패딩부분을 0으로 처리하기 위함임
         if mask is not None:
             energy = energy.masked_fill(mask==0, -1e10)
         # 마스크(mask) 값이 0인 부분을 -1e10으로 채우기 - softmax 이후 0%가 되도록
@@ -180,14 +182,15 @@ class MultiHeadAttentionLayer(nn.Module):
 
         # x: [batch_size, query_len, n_heads, head_dim] <<
 
-        x = x.view(batch_size, -1, self.hidden_dim)
+        x = x.view(batch_size, -1, self.hidden_dim) # 콘캣
         # view(): 토치에서 이 함수는 다차원 행렬을 저차원 행렬로 변환해줌
 
         # x: [batch_size, query_len, hidden_dim] << 변경되는 부분 참고     n_heads x head_dim = hidden_dim
         # 이 모양은 처음에 넣었던 각 키, 쿼리, 밸류 모양과 동일함
 
         x = self.fc_o(x)
-        # 원래 모양만든거 가지고 리니어 한번 통과해서 weight값 곱해준 것 - feedforward network 부분
+        # 원래 모양만든거 가지고 리니어 한번 통과해서 weight값 곱해준 것. 헤드를 한번에 구하지 않고 물리적으로 따로 구할 경우 여기서 원래 hidden_dim으로 바뀌지만
+        # 지금은 병렬로 한꺼번에 처리했기 때문에 이 레이어 전부터 hidden_dim 과 모양 일치함
 
         # x: [batch_size, query_len, hidden_dim]
 
@@ -345,10 +348,10 @@ class DecoderLayer(nn.Module):
         
         # trg: [batch_size, trg_len, hidden_dim]
 
-        # encoder attention
+        # encoder-decoder attention
         # 디코더의 쿼리(Query)를 이용해 인코더를 어텐션(attention)
         _trg, attention = self.encoder_attention(trg, enc_src, enc_src, src_mask)
-        #  자신(디코더)의 쿼리, 인코더의 키, 인코더의 밸류
+        # 자신(디코더)의 쿼리, 인코더의 키, 인코더의 밸류
         
         # dropout, residual connection and layer norm
         trg = self.enc_attn_layer_norm(trg + self.dropout(_trg))
@@ -419,7 +422,6 @@ class Decoder(nn.Module):
 class Transformer(nn.Module):
     def __init__(self, encoder, decoder, src_pad_idx, trg_pad_idx, device):
         super().__init__()
-
         self.encoder = encoder
         self.decoder = decoder
         self.src_pad_idx = src_pad_idx
@@ -432,7 +434,7 @@ class Transformer(nn.Module):
         # src: [batch_size, src_len]
 
         src_mask = (src != self.src_pad_idx).unsqueeze(1).unsqueeze(2)
-
+        
         # src_mask: [batch_size, 1, 1, src_len]
 
         return src_mask
@@ -512,7 +514,7 @@ class Transformer(nn.Module):
         # trg_mask: [batch_size, 1, trg_len, trg_len]
 
         enc_src = self.encoder(src, src_mask)
-
+        
         # enc_src: [batch_size, src_len, hidden_dim]
         
         output, attention = self.decoder(trg, enc_src, trg_mask, src_mask)
@@ -526,18 +528,19 @@ class Transformer(nn.Module):
 ######## Training ########
 INPUT_DIM = len(SRC.vocab)
 OUTPUT_DIM = len(TRG.vocab)
-HIDDEN_DIM = 256
-ENC_LAYERS = 3
-DEC_LAYERS = 3
-ENC_HEADS = 8
+HIDDEN_DIM = 256    # 전체 디멘션
+ENC_LAYERS = 3      # 인코더 레이어 개수
+DEC_LAYERS = 3      # 디코더 레이어 개수
+ENC_HEADS = 8       # 헤드 개수
 DEC_HEADS = 8
-ENC_PF_DIM = 512
+ENC_PF_DIM = 512    # 포지션 임베딩 차원
 DEC_PF_DIM = 512
 ENC_DROPOUT = 0.1
 DEC_DROPOUT = 0.1
 
 SRC_PAD_IDX = SRC.vocab.stoi[SRC.pad_token]
 TRG_PAD_IDX = TRG.vocab.stoi[TRG.pad_token]
+# 패딩 토큰 무엇인지 저장 (1 임)
 
 # 인코더(encoder)와 디코더(decoder) 객체 선언
 enc = Encoder(INPUT_DIM, HIDDEN_DIM, ENC_LAYERS, ENC_HEADS, ENC_PF_DIM, ENC_DROPOUT, device)
@@ -553,10 +556,11 @@ print(f'The model has {count_parameters(model):,} trainable parameters')
 
 def initialize_weights(m):
     if hasattr(m, 'weight') and m.weight.dim() > 1:
-        # m(여기서는 다음 줄에서 모델을 넘겼다)에서 'weight'에 해당하는 속성이 존재하면 True반환 & 가중치 차원이 1보다 크면 가중치 초기화 진행
+        # hastter : 속성이름을 파라미터로 주었을 때, 객체에 속성이 존재할 경우 True, 아닐 경우 False를 반환한다.
+        # m(모델)에서 'weight'에 해당하는 속성이 존재하면 True반환 & 가중치 차원이 1보다 크면 가중치 초기화 진행
         nn.init.xavier_uniform_(m.weight.data)
 # xavier uniform 초기화는 인풋과 아웃풋 개수를 반영해서 처음 가중치를 초기화 시킨다
-# 공식은 루트(6/인풋크기+아웃풋크기)
+# 노드개수가 너무 많으면 exploding, 적으면 gradient vanishing 문제가 생기기 때문에 앞뒤 노드 개수를 반영해 가중치를 초기화한다
 
 model.apply(initialize_weights)
 
@@ -565,9 +569,8 @@ model.apply(initialize_weights)
 LEARNING_RATE = 0.0005
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
-# 뒷 부분의 패딩(padding)에 대해서는 값 무시
+# 패딩(padding)에 대해서는 값 무시
 criterion = nn.CrossEntropyLoss(ignore_index = TRG_PAD_IDX)
-
 
 # 모델 학습(train) 함수
 def train(model, iterator, optimizer, criterion, clip):
@@ -578,20 +581,26 @@ def train(model, iterator, optimizer, criterion, clip):
     for i, batch in enumerate(iterator):
         src = batch.src
         trg = batch.trg
-
+        
+        # for idx in range(len(batch)):
+        #     a = (trg[idx]==3).nonzero(as_tuple=False).item()
+        #     trg[idx] = torch.cat(trg[idx, 0:a], trg[idx, a+1:])
+            
         optimizer.zero_grad()
 
         # 출력 단어의 마지막 인덱스(<eos>)는 제외
         # 입력을 할 때는 <sos>부터 시작하도록 처리
         output, _ = model(src, trg[:,:-1])
-
-        # output: [배치 크기, trg_len - 1, output_dim]
-        # trg: [배치 크기, trg_len]
+        # <sos> I am a student ===decoder===> I am a student <eos>
+        # 사실 동빈이가 구라침. 여기서 마지막 패딩자리만 빠짐
+        
+        # trg: [배치 크기, trg_len] : torch.Size([128, 28])
+        # output: [배치 크기, trg_len - 1, output_dim] : torch.Size([128, 27, 5920])
 
         output_dim = output.shape[-1]
 
         output = output.contiguous().view(-1, output_dim)
-        # 출력 단어의 인덱스 0(<sos>)은 제외
+        # 타겟 단어의 인덱스 0(<sos>)은 제외 : 출력 output과 비교하기 위해서, 출력값은 <sos> 제외하고 시작해서 <eos> 까지 출력될 것임
         trg = trg[:,1:].contiguous().view(-1)
 
         # output: [배치 크기 * trg_len - 1, output_dim]
@@ -629,7 +638,7 @@ def evaluate(model, iterator, criterion):
             # 입력을 할 때는 <sos>부터 시작하도록 처리
             output, _ = model(src, trg[:,:-1])
 
-            # output: [배치 크기, trg_len - 1, output_dim]
+            # output: [배치 크기, trg_len - 1, output_dim=vocab_size]
             # trg: [배치 크기, trg_len]
 
             output_dim = output.shape[-1]
@@ -657,9 +666,9 @@ def epoch_time(start_time, end_time):
     return elapsed_mins, elapsed_secs
 
 
-N_EPOCHS = 50
+N_EPOCHS = 2
 CLIP = 1
-best_valid_loss = float('inf')
+best_valid_loss = float('inf') # 양의 무한대부터 시작
 
 for epoch in range(N_EPOCHS):
     start_time = time.time() # 시작 시간 기록
@@ -687,8 +696,12 @@ model.load_state_dict(torch.load('transformer_german_to_english.pt'))
 test_loss = evaluate(model, test_iterator, criterion)
 
 print(f'Test Loss: {test_loss:.3f} | Test PPL: {math.exp(test_loss):.3f}')
-# PPL : 언어모델의 평가 방법. Perplexity
-
+# PPL : 언어모델의 평가 방법. Perplexity. 직역 시 당혹스러운 정도. 낮을 수록 좋다
+# 이전 단어로 다음 단어를 예측할 때 몇 개의 단어 후보를 고려하는지
+# 단, 테스트 데이터가 충분히 많고, 언어 모델을 활용할 도메인에 적합한 테스트 데이터셋으로 구성된 경우에 한함
+# 이전 단어들을 기반으로 다음 단어를 예측할 때마다 평균적으로 몇개의 단어 후보 중 정답을 찾는지, 그 수가 적을 수록 좋은 것
+# 따라서 같은 테스트 데이터셋에서 언어 모델 간의 PPL 값을 비교하면 어떤 언어 모델이 우수한 성능을 보이는지 알 수 있음
+# 크로스엔트로피를 지수화하면 perplexity가 됨
 #=============================================================================================================================
 
 
@@ -713,48 +726,49 @@ print(f'Test Loss: {test_loss:.3f} | Test PPL: {math.exp(test_loss):.3f}')
 def translate_sentence(sentence, src_field, trg_field, model, device, max_len=50, logging=True):
     model.eval() # 평가 모드
 
-    if isinstance(sentence, str):
+    if isinstance(sentence, str): # isinstance : sentence 의 자료형이 str 인지 확인. bool 반환
         nlp = spacy.load('de')
         tokens = [token.text.lower() for token in nlp(sentence)]
     else:
         tokens = [token.lower() for token in sentence]
 
     # 처음에 <sos> 토큰, 마지막에 <eos> 토큰 붙이기
-    tokens = [src_field.init_token] + tokens + [src_field.eos_token]
+    tokens = [src_field.init_token] + tokens + [src_field.eos_token]    # 처음에 Filed 객체로 선언해둠
     if logging:
         print(f"전체 소스 토큰: {tokens}")
 
-    src_indexes = [src_field.vocab.stoi[token] for token in tokens]
+    src_indexes = [src_field.vocab.stoi[token] for token in tokens]     # 소스문장을 번호로 바꿈
     if logging:
         print(f"소스 문장 인덱스: {src_indexes}")
 
-    src_tensor = torch.LongTensor(src_indexes).unsqueeze(0).to(device)
+    src_tensor = torch.LongTensor(src_indexes).unsqueeze(0).to(device)  # 토치텐서에 실어주기
 
     # 소스 문장에 따른 마스크 생성
-    src_mask = model.make_src_mask(src_tensor)
+    src_mask = model.make_src_mask(src_tensor)      # 패딩부분 가리는 용도 마스크 생성
 
     # 인코더(endocer)에 소스 문장을 넣어 출력 값 구하기
     with torch.no_grad():
         enc_src = model.encoder(src_tensor, src_mask)
-
+    
     # 처음에는 <sos> 토큰 하나만 가지고 있도록 하기
     trg_indexes = [trg_field.vocab.stoi[trg_field.init_token]]
 
     for i in range(max_len): # max_len 만큼 반복해서 단어 뽑기
-        trg_tensor = torch.LongTensor(trg_indexes).unsqueeze(0).to(device)
+        trg_tensor = torch.LongTensor(trg_indexes).unsqueeze(0).to(device)  # 1배치니까
 
         # 출력 문장에 따른 마스크 생성
         trg_mask = model.make_trg_mask(trg_tensor)
-
+        
         with torch.no_grad():
             output, attention = model.decoder(trg_tensor, enc_src, trg_mask, src_mask)
 
         # 출력 문장에서 가장 마지막 단어만 사용
-        pred_token = output.argmax(2)[:,-1].item()
+        pred_token = output.argmax(2)[:,-1].item()  # 3번째 차원(vocab사이즈만큼의 크기임)에 대해 argmax 하고 마지막 단어(인덱스)만 빼서 붙이기
+        
         trg_indexes.append(pred_token) # 출력 문장에 더하기
 
         # <eos>를 만나는 순간 끝
-        if pred_token == trg_field.vocab.stoi[trg_field.eos_token]:
+        if pred_token == trg_field.vocab.stoi[trg_field.eos_token]:     # 현재 predict한 것이 <eos> 라면 끝냄
             break
 
     # 각 출력 단어 인덱스를 실제 단어로 변환
@@ -817,7 +831,7 @@ def show_bleu(data, src_field, trg_field, model, device, max_len=50):
     pred_trgs = []
     index = 0
 
-    for datum in data:
+    for datum in data:  # 버킷이터레이터로 만든 test_dataset
         src = vars(datum)['src']
         trg = vars(datum)['trg']
 
