@@ -1,5 +1,21 @@
 import spacy
+'''
+SPACY 라이브러리 기능
 
+Tokenization
+Part-of-speech (POS) Tagging
+Depedency Parsing
+Lemmatization
+Sentence Boundary Detection (SBD)
+Named Entity Recognition (NER)
+Similarity
+Text Classification
+Rule-based Matching
+Training
+Serialization
+'''
+
+# 독어와 영어 
 spacy_en = spacy.load('en_core_web_sm')
 spacy_de = spacy.load('de_core_news_sm')
 
@@ -15,12 +31,14 @@ def tokenize_de(text):
 def tokenize_en(text):
     return [token.text for token in spacy_en.tokenizer(text)]
 
-# Field 라이브러리를 이용해 데이터셋에 대한 구체적인 전처리 내용을 명시.
+# Field :: 라이브러리를 이용해 데이터셋에 대한 구체적인 전처리 내용을 명시.
+# BucketIterator :: 모든 텍스트작업을 일괄로 처리, 단어를 인덱스 숫자로 변환. 
 from torchtext.data import Field, BucketIterator
 
 SRC = Field(tokenize=tokenize_de, init_token="<sos>", eos_token="<eos>", lower=True, batch_first=True)
 TRG = Field(tokenize=tokenize_en, init_token="<sos>", eos_token="<eos>", lower=True, batch_first=True)
 
+# Multi30k : torchtext 라이브러리 데이터셋
 from torchtext.datasets import Multi30k 
 
 train_dataset, valid_dataset, test_dataset = Multi30k.splits(exts=(".de", ".en"), fields=(SRC, TRG))
@@ -34,12 +52,12 @@ train_dataset, valid_dataset, test_dataset = Multi30k.splits(exts=(".de", ".en")
 평가 데이터셋 : 1014개
 테스트 데이터셋 : 1000개
 '''
-
 # print(vars(train_dataset.examples[30])['src'])
 # print(vars(train_dataset.examples[30])['trg'])
 # ['ein', 'mann', ',', 'der', 'mit', 'einer', 'tasse', 'kaffee', 'an', 'einem', 'urinal', 'steht', '.']
 # ['a', 'man', 'standing', 'at', 'a', 'urinal', 'with', 'a', 'coffee', 'cup', '.']
 
+# Field 객체의 build_vocab 통해 사전 훈련된 워드 임베딩 사용
 SRC.build_vocab(train_dataset, min_freq=2)
 TRG.build_vocab(train_dataset, min_freq=2)
 
@@ -47,8 +65,6 @@ TRG.build_vocab(train_dataset, min_freq=2)
 # print(f"len(TRG): {len(TRG.vocab)}")
 # len(SRC): 7853
 # len(TRG): 5893
-
-
 
 # print(TRG.vocab.stoi["abcabc"]) # 없는 단어: 0
 # print(TRG.vocab.stoi[TRG.pad_token]) # 패딩(padding): 1
@@ -62,7 +78,6 @@ TRG.build_vocab(train_dataset, min_freq=2)
 # 3   
 # 4112
 # 1752
-
 
 import torch
 
@@ -86,7 +101,6 @@ train_iterator, valid_iterator, test_iterator = BucketIterator.splits(
 
 #     # 첫 번째 배치만 확인
 #     break
-
 
 import torch.nn as nn
 
@@ -145,6 +159,7 @@ class MultiHeadAttentionLayer(nn.Module):
         if mask is not None:
             # 마스크(mask) 값이 0인 부분을 -1e10으로 채우기
             energy = energy.masked_fill(mask==0, -1e10)
+            # 존재하지않는 단어 = 0
 
         # 어텐션(attention) 스코어 계산: 각 단어에 대한 확률 값
         attention = torch.softmax(energy, dim=-1)
@@ -153,7 +168,6 @@ class MultiHeadAttentionLayer(nn.Module):
 
         # 여기에서 Scaled Dot-Product Attention을 계산
         x = torch.matmul(self.dropout(attention), V)
-
         # x: [batch_size, n_heads, query_len, head_dim]
 
         x = x.permute(0, 2, 1, 3).contiguous()
@@ -170,6 +184,15 @@ class MultiHeadAttentionLayer(nn.Module):
 
         return x, attention
 
+
+
+# 2개의 fully connected layer(or dense layer)로 구성
+# Token 마다(position 마다) 독립적으로 적용
+# 첫번째 layer에 ReLU 활성화 함수 사용
+# FNN(x) = max(0, xW1+b1)W2+b2
+# :: x는 첫번째 FCL에 입력되는 입력 벡터를 의미
+# :: W1는 입력벡터와 첫번째 FCL 사이의 가중치 행렬
+# :: W2는 첫번쨰 FCL과 두번째 FCL사이의 가중치 행렬
 
 class PositionwiseFeedforwardLayer(nn.Module):
     def __init__(self, hidden_dim, pf_dim, dropout_ratio):
@@ -212,7 +235,7 @@ class EncoderLayer(nn.Module):
         # src_mask: [batch_size, src_len]
 
         # self attention
-        # 필요한 경우 마스크(mask) 행렬을 이용하여 어텐션(attention)할 단어를 조절 가능
+        # 필요한 경우 마스크(mask) 행렬을 이용하여 어텐션(attention)할 단어를 조절 가능 
         _src, _ = self.self_attention(src, src, src, src_mask)
 
         # dropout, residual connection and layer norm
@@ -230,6 +253,7 @@ class EncoderLayer(nn.Module):
 
         return src
     
+# n_layers : Encoder Block의 개수
 class Encoder(nn.Module):
     def __init__(self, input_dim, hidden_dim, n_layers, n_heads, pf_dim, dropout_ratio, device, max_length=100):
         super().__init__()
@@ -269,7 +293,6 @@ class Encoder(nn.Module):
         # src: [batch_size, src_len, hidden_dim]
 
         return src # 마지막 레이어의 출력을 반환
-    
 
 class DecoderLayer(nn.Module):
     def __init__(self, hidden_dim, n_heads, pf_dim, dropout_ratio, device):
@@ -447,7 +470,6 @@ class Transformer(nn.Module):
         # attention: [batch_size, n_heads, trg_len, src_len]
 
         return output, attention
-    
 
 #=====================================================================================================
  
@@ -513,6 +535,7 @@ def train(model, iterator, optimizer, criterion, clip):
 
         # output: [배치 크기, trg_len - 1, output_dim]
         # trg: [배치 크기, trg_len]
+        
 
         output_dim = output.shape[-1]
 
@@ -712,7 +735,7 @@ def display_attention(sentence, translation, attention, n_heads=8, n_rows=4, n_c
     
 example_idx = 10
 # src = vars(test_dataset.examples[example_idx])['src']
-src = tokenize_de('Zwei Hunde spielen im Schnee.')
+src = tokenize_de('Drei Hunde und zwei Mädchen spazieren')
 # 모델 출력 결과: two dogs play in the snow . <eos>
 
 # trg = vars(test_dataset.examples[example_idx])['trg']
@@ -731,7 +754,6 @@ src = tokenize_de('Zwei Hunde spielen im Schnee.')
 전체 소스 토큰: ['<sos>', 'zwei', 'hunde', 'spielen', 'im', 'schnee', '.', '<eos>']
 소스 문장 인덱스: [2, 18, 121, 57, 20, 123, 4, 3]
 모델 출력 결과: two dogs play in the snow . <eos>
-
 
 '''
 

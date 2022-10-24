@@ -188,7 +188,7 @@ print('max_len:', max_length) # max_len: 38 # max_length
 
 
 image_ids = list(mapping.keys())
-print(list(mapping.values()))
+# print(list(mapping.values()))
 # print(image_ids[0])
 split = int(len(image_ids) * 0.90) # train_test_split
 train = image_ids[:] # 안함
@@ -264,18 +264,20 @@ def data_generator(data_keys, mapping, features, tokenizer, max_length, vocab_si
 inputs1 = Input(shape=(1000,)) # Vgg16 model
 fe1 = Dropout(0.4)(inputs1)
 fe2 = Dense(256, activation='relu')(fe1)
-# sequence feature layers
+
+
 inputs2 = Input(shape=(max_length,))
 se1 = Embedding(vocab_size, 256, mask_zero=True)(inputs2)
 se2 = Dropout(0.4)(se1)
 se3 = Dense(256)(se2)
-# se3 = LSTM(256)(se2)
 
 # decoder model
 decoder1 = add([fe2, se3])
-decoder2 = LSTM(256)(decoder1)
-decoder3 = Dense(256, activation='relu')(decoder2)
-outputs = Dense(vocab_size, activation='softmax')(decoder3)  
+decoder2 = LSTM(256, return_sequences=True)(decoder1)
+decoder3 = LSTM(256, return_sequences=True)(decoder2)
+decoder4 = LSTM(256)(decoder3)
+decoder5 = Dense(256, activation='relu')(decoder4)
+outputs = Dense(vocab_size, activation='softmax')(decoder5)
 
 model = Model(inputs=[inputs1, inputs2], outputs=outputs)
 model.compile(loss='categorical_crossentropy', optimizer='adam')
@@ -283,13 +285,16 @@ model.compile(loss='categorical_crossentropy', optimizer='adam')
 
 # train the model
 print('start training...')
-epochs = 50
+epochs = 20
 batch_size = 32
 steps = len(train) // batch_size # 1 batch 당 훈련하는 데이터 수
 # len(train): 8091 / steps: 252
 # 제너레이터 함수에서 yield로 252개의 [X1, X2], y 묶음이 차곡차곡 쌓여 있고  steps_per_epoch=steps 이 옵션으로
 # epoch 1번짜리 fit을 돌때 252번(정해준steps번) generator 를 호출함. iterating 을 steps번 함
 
+import time
+
+start = time.time()
 for i in range(epochs):
     print(f'epoch: {i+1}')
     # create data generator
@@ -297,6 +302,9 @@ for i in range(epochs):
     # fit for one epoch
     model.fit(generator, epochs=1, steps_per_epoch=steps, verbose=1) # generator -> [X1, X2], y
 print('done training.')
+end = time.time()
+
+print("걸린시간 : ", round(end-start,4))
 
 # save the model
 model.save(WORKING_DIR+'/best_model.h5')
