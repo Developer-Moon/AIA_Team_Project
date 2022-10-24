@@ -5,3 +5,6 @@ _save/
 COCO_features/
 .data/
 transformer_german_to_english.pt
+wd-v1-3-full.ckpt
+_data/test_img.jpg
+stable-diffusion-webui/
