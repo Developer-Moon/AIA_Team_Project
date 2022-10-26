@@ -15,7 +15,7 @@ from torchvision import transforms
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 device = torch.device(device)
 
-root_path = 'D:\AIA_Team_Project\_data/'
+root_path = 'D:\study_data\_data/team_project\cityscapes_data/'
 
 data_dir = root_path
 
