@@ -15,7 +15,7 @@ from torchvision import transforms
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 device = torch.device(device)
 
-root_path = 'D:\AIA_Team_Project\_data/'
+root_path = 'E:/AIA_Team_Project/data/'
 
 data_dir = root_path
 
@@ -27,15 +27,16 @@ val_dir = os.path.join(data_dir, "val")
 
 # train_dir 경로에 있는 모든 파일을 리스트의 형태로 불러와서 train_fns에 저장합니다.
 train_fns = os.listdir(train_dir)
+# print(train_fns)
 
 # val_dir 경로에 있는 모든 파일을 리스트의 형태로 불러와서 val_fns에 저장합니다.
 val_fns = os.listdir(val_dir)
 
-print(len(train_fns), len(val_fns))
+# print(len(train_fns), len(val_fns))
 
 
 # train_dir(문자열)와 train_fns[0](문자열)의 경로를 결합하여 sample_image_fp(샘플 이미지의 경로)에 저장합니다.
-sample_image_fp = os.path.join(train_dir, train_fns[3])
+sample_image_fp = os.path.join(train_dir, train_fns[0])
 
 # PIL 라이브러리의 Image 모듈을 사용하여, sample_image_fp를 불러옵니다.
 # RGB 형태로 변환하여 sample_image에 저장하는 것으로 이해했는데, ".convert("RGB")" 코드는 없어도 될 것 같습니다.
@@ -71,11 +72,11 @@ def split_image(image) :
 cityscape, label = split_image(sample_image)
 
 label_class = label_model.predict(label.reshape(-1, 3)).reshape(256, 256)
-# fig, axes = plt.subplots(1, 3, figsize = (15, 5))
-# axes[0].imshow(cityscape)
-# axes[1].imshow(label)
-# axes[2].imshow(label_class)
-# plt.show()
+fig, axes = plt.subplots(1, 3, figsize = (15, 5))
+axes[0].imshow(cityscape)
+axes[1].imshow(label)
+axes[2].imshow(label_class)
+plt.show()
 
 class CityscapeDataset(Dataset):
     
