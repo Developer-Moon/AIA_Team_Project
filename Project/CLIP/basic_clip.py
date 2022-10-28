@@ -57,7 +57,7 @@ class CFG:
     model_name = 'resnet50'
     image_embedding = 2048
     text_encoder_model = "distilbert-base-uncased" # uncased: 대소문자 구별x, MLM
-    text_embedding = 768
+    text_embedding = 768    # 버트모델 인코더 통과한 직후 차원
     text_tokenizer = "distilbert-base-uncased"
     max_length = 200
 
@@ -271,16 +271,17 @@ class CLIPModel(nn.Module):
         text_embeddings = self.text_projection(text_features)       # (32, 256)
         
         # Calculating the Loss
-        logits = (text_embeddings @ image_embeddings.T) / self.temperature  # 템퍼쳐 값이 커질 수록 logits 값이 줄어듦. 기준이 빡세짐. 얘는 로그소프트맥스 취하고
-        images_similarity = image_embeddings @ image_embeddings.T           # 어텐션 에너지값은 그냥 소프트맥스 취해서 로스를 구함
+        logits = (text_embeddings @ image_embeddings.T) / self.temperature  # 템퍼쳐 값이 커질 수록 logits 값이 줄어듦. 기준이 빡세짐.
+        images_similarity = image_embeddings @ image_embeddings.T           # self 유사도, 어텐션 스코어
         texts_similarity = text_embeddings @ text_embeddings.T
+
         # 텍스트 피쳐와 이미지 피쳐를 행렬곱해서 transformer처럼 셀프어텐션 에너지값을 구함
         targets = F.softmax(
             (images_similarity + texts_similarity) / 2 * self.temperature, dim=-1
         ) # images_similarity: (32, 32)   texts_similarity: (32, 32)  tartgets: (32, 32)
         
         texts_loss = cross_entropy(logits, targets, reduction='none')
-        images_loss = cross_entropy(logits.T, targets.T, reduction='none')
+        images_loss = cross_entropy(logits.T, targets, reduction='none')
         loss =  (images_loss + texts_loss) / 2.0 # shape: (batch_size)
         return loss.mean()
 
@@ -333,7 +334,7 @@ def train_epoch(model, train_loader, optimizer, lr_scheduler, step):
     loss_meter = AvgMeter()
     tqdm_object = tqdm(train_loader, total=len(train_loader))
     for batch in tqdm_object:
-        batch = {k: v.to(CFG.device) for k, v in batch.items() if k != "caption"}
+        batch = {k: v.to(CFG.device) for k, v in batch.items() if k != "caption"}   # caption부분만 빼고 불러오기
         loss = model(batch)
         optimizer.zero_grad()
         loss.backward()
@@ -362,7 +363,7 @@ def valid_epoch(model, valid_loader):
         tqdm_object.set_postfix(valid_loss=loss_meter.avg)
     return loss_meter
 
-'''
+# '''
 def main():
     train_df, valid_df = make_train_valid_dfs()
     tokenizer = DistilBertTokenizer.from_pretrained(CFG.text_tokenizer)
@@ -374,9 +375,8 @@ def main():
     params = [
         {"params": model.image_encoder.parameters(), "lr": CFG.image_encoder_lr},
         {"params": model.text_encoder.parameters(), "lr": CFG.text_encoder_lr},
-        {"params": itertools.chain(
-            model.image_projection.parameters(), model.text_projection.parameters()
-        ), "lr": CFG.head_lr, "weight_decay": CFG.weight_decay}
+        {"params": itertools.chain(model.image_projection.parameters(), model.text_projection.parameters()), 
+        "lr": CFG.head_lr, "weight_decay": CFG.weight_decay}
     ]
     optimizer = torch.optim.AdamW(params, weight_decay=0.)
     lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(  # reduce lr과 동일한 역할
@@ -405,7 +405,8 @@ def main():
 end_time = main()
 print('took', round(end_time), 'sec.')
 print(f'epochs: {CFG.epochs}    batch size: {CFG.batch_size}')
-'''
+# '''
+
 def get_image_embeddings(valid_df, model_path):
     tokenizer = DistilBertTokenizer.from_pretrained(CFG.text_tokenizer)
     valid_loader = build_loaders(valid_df, tokenizer, mode="valid")
@@ -436,9 +437,9 @@ def find_matches(model, image_embeddings, query, image_filenames, n=9):
         )
         text_embeddings = model.text_projection(text_features)              # 이미지와 디멘션 맞춰줌 fc_out
     
-    # image_embeddings_n = F.normalize(image_embeddings, p=2, dim=-1)         # 이미지는 get_image_embeddings에서 프로젝션했음
-    # text_embeddings_n = F.normalize(text_embeddings, p=2, dim=-1)           # 이미지는 채널값에 대해, 텍스트는 토큰값에 대해 L2norm
-    dot_similarity = text_embeddings @ image_embeddings.T                     # (1, 256) @ (256, 8090) = (1, 8090)
+    image_embeddings_n = F.normalize(image_embeddings, p=2, dim=-1)         # 이미지는 get_image_embeddings에서 프로젝션했음
+    text_embeddings_n = F.normalize(text_embeddings, p=2, dim=-1)           # 이미지는 채널값에 대해, 텍스트는 토큰값에 대해 L2norm, 하는 이유는 두 임베딩값 곱할때 값의 편차를 줄이기 위해
+    dot_similarity = text_embeddings_n @ image_embeddings_n.T               # (1, 256) @ (8090, 256).T = (1, 8090)
     # print(text_embeddings, text_embeddings_n)
     
     values, indices = torch.topk(dot_similarity.squeeze(0), n * 5) # (8090,)만든 후 argmax 인데 제일 큰거부터 (n=)9*5개 인덱스 반환함
@@ -459,7 +460,7 @@ def find_matches(model, image_embeddings, query, image_filenames, n=9):
     
 find_matches(model, 
              image_embeddings,
-             query="cats on the grass",
+             query="surfers in the ocean",
              image_filenames=valid_df['image'].values,      # valid 데이터셋의 이미지들 중에서 텍스트와 매치되는 이미지를 보여줌
              n=9)
 
