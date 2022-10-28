@@ -195,12 +195,15 @@ fe2 = Dense(256, activation='relu')(fe1)
 inputs2 = Input(shape=(max_length,))
 se1 = Embedding(vocab_size, 256, mask_zero=True)(inputs2)
 se2 = Dropout(0.4)(se1)
-se3 = LSTM(256)(se2)
+se3 = Dense(256)(se2)
 
 # decoder model
 decoder1 = add([fe2, se3])
-decoder2 = Dense(256, activation='relu')(decoder1)
-outputs = Dense(vocab_size, activation='softmax')(decoder2)
+decoder2 = LSTM(5, return_sequences=True)(decoder1)
+decoder3 = LSTM(5, return_sequences=True)(decoder2)
+decoder4 = LSTM(10)(decoder3)
+decoder5 = Dense(32, activation='relu')(decoder4)
+outputs = Dense(vocab_size, activation='softmax')(decoder5)
 
 model = Model(inputs=[inputs1, inputs2], outputs=outputs)
 model.compile(loss='categorical_crossentropy', optimizer='adam')

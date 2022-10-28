@@ -169,7 +169,7 @@ def data_generator(features, captions, tokenizer, max_length, vocab_size, batch_
 
 # encoder model
 # image feature layers
-inputs1 = Input(shape=(1000,))
+inputs1 = Input(shape=(4096,))
 fe1 = Dropout(0.4)(inputs1)
 fe2 = Dense(256, activation='relu')(fe1)
 # sequence feature layers
@@ -180,9 +180,11 @@ se3 = Dense(256)(se2)
 
 # decoder model
 decoder1 = add([fe2, se3])
-decoder2 = LSTM(256)(decoder1)
-decoder3 = Dense(256, activation='relu')(decoder2)
-outputs = Dense(vocab_size, activation='softmax')(decoder3)
+decoder2 = LSTM(5, return_sequences=True)(decoder1)
+decoder3 = LSTM(5, return_sequences=True)(decoder2)
+decoder4 = LSTM(10)(decoder3)
+decoder5 = Dense(32, activation='relu')(decoder4)
+outputs = Dense(vocab_size, activation='softmax')(decoder5)
 
 model = Model(inputs=[inputs1, inputs2], outputs=outputs)
 model.compile(loss='categorical_crossentropy', optimizer='adam')
