@@ -737,7 +737,11 @@ def display_attention(sentence, translation, attention, n_heads=8, n_rows=4, n_c
 example_idx = 10
 # src = vars(test_dataset.examples[example_idx])['src']
 
+<<<<<<< HEAD
+src = tokenize_de('Paar liegt bei Sonnenuntergang am Strand')
+=======
 src = tokenize_de('Mädchen, die mit Hunden spazieren gehen')
+>>>>>>> 8a700ee5f6b094097013449ec73c6d81c5b77005
 # 모델 출력 결과: two dogs play in the snow . <eos>
 
 # trg = vars(test_dataset.examples[example_idx])['trg']
@@ -757,7 +761,104 @@ src = tokenize_de('Zwei Hunde spielen im Schnee.')
 소스 문장 인덱스: [2, 18, 121, 57, 20, 123, 4, 3]
 모델 출력 결과: two dogs play in the snow . <eos>
 
-'''
+# '''
+
+# import matplotlib.pyplot as plt
+# import matplotlib.ticker as ticker
+
+# def display_attention(sentence, translation, attention, n_heads=8, n_rows=4, n_cols=2):
+
+#     assert n_rows * n_cols == n_heads
+
+#     # 출력할 그림 크기 조절
+#     fig = plt.figure(figsize=(15, 25))
+
+#     for i in range(n_heads):
+#         ax = fig.add_subplot(n_rows, n_cols, i + 1)
+
+#         # 어텐션(Attention) 스코어 확률 값을 이용해 그리기
+#         _attention = attention.squeeze(0)[i].cpu().detach().numpy()
+
+#         cax = ax.matshow(_attention, cmap='bone')
+
+#         ax.tick_params(labelsize=12)
+#         ax.set_xticklabels([''] + ['<sos>'] + [t.lower() for t in sentence] + ['<eos>'], rotation=45)
+#         ax.set_yticklabels([''] + translation)
+
+#         ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+#         ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
+
+#     plt.show()
+#     plt.close()
+
+# example_idx = 10
+
+# src = vars(test_dataset.examples[example_idx])['src']
+# trg = vars(test_dataset.examples[example_idx])['trg']
+
+# print(f'소스 문장: {src}')
+# print(f'타겟 문장: {trg}')
+
+# translation, attention = translate_sentence(src, SRC, TRG, model, device, logging=True)
+
+# print("모델 출력 결과:", " ".join(translation))
+
+# display_attention(src, translation, attention)
+
+# from torchtext.data.metrics import bleu_score
+
+# def show_bleu(data, src_field, trg_field, model, device, max_len=50):
+#     trgs = []
+#     pred_trgs = []
+#     index = 0
+
+#     for datum in data:
+#         src = vars(datum)['src']
+#         trg = vars(datum)['trg']
+
+#         pred_trg, _ = translate_sentence(src, src_field, trg_field, model, device, max_len, logging=False)
+
+#         # 마지막 <eos> 토큰 제거
+#         pred_trg = pred_trg[:-1]
+
+#         pred_trgs.append(pred_trg)
+#         trgs.append([trg])
+
+#         index += 1
+#         if (index + 1) % 100 == 0:
+#             print(f"[{index + 1}/{len(data)}]")
+#             print(f"예측: {pred_trg}")
+#             print(f"정답: {trg}")
+
+#     bleu = bleu_score(pred_trgs, trgs, max_n=4, weights=[0.25, 0.25, 0.25, 0.25])
+#     print(f'Total BLEU Score = {bleu*100:.2f}')
+
+#     individual_bleu1_score = bleu_score(pred_trgs, trgs, max_n=4, weights=[1, 0, 0, 0])
+#     individual_bleu2_score = bleu_score(pred_trgs, trgs, max_n=4, weights=[0, 1, 0, 0])
+#     individual_bleu3_score = bleu_score(pred_trgs, trgs, max_n=4, weights=[0, 0, 1, 0])
+#     individual_bleu4_score = bleu_score(pred_trgs, trgs, max_n=4, weights=[0, 0, 0, 1])
+
+#     print(f'Individual BLEU1 score = {individual_bleu1_score*100:.2f}') 
+#     print(f'Individual BLEU2 score = {individual_bleu2_score*100:.2f}') 
+#     print(f'Individual BLEU3 score = {individual_bleu3_score*100:.2f}') 
+#     print(f'Individual BLEU4 score = {individual_bleu4_score*100:.2f}') 
+
+#     cumulative_bleu1_score = bleu_score(pred_trgs, trgs, max_n=4, weights=[1, 0, 0, 0])
+#     cumulative_bleu2_score = bleu_score(pred_trgs, trgs, max_n=4, weights=[1/2, 1/2, 0, 0])
+#     cumulative_bleu3_score = bleu_score(pred_trgs, trgs, max_n=4, weights=[1/3, 1/3, 1/3, 0])
+#     cumulative_bleu4_score = bleu_score(pred_trgs, trgs, max_n=4, weights=[1/4, 1/4, 1/4, 1/4])
+
+#     print(f'Cumulative BLEU1 score = {cumulative_bleu1_score*100:.2f}') 
+#     print(f'Cumulative BLEU2 score = {cumulative_bleu2_score*100:.2f}') 
+#     print(f'Cumulative BLEU3 score = {cumulative_bleu3_score*100:.2f}') 
+#     print(f'Cumulative BLEU4 score = {cumulative_bleu4_score*100:.2f}') 
+
+
+# show_bleu(test_dataset, SRC, TRG, model, device)
+
+
+
+
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
