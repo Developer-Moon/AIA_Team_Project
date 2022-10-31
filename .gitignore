@@ -9,3 +9,4 @@
 models
 *.txt
 *.bpe
+.idea
