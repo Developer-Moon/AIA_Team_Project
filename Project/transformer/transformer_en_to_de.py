@@ -15,35 +15,32 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 spacy_en = en_core_web_sm.load() # 영어 toknizer
 spacy_de = spacy.load('de_core_news_sm') # 독일어 toknizer
 
+'''
 # 간단히 토큰화(tokenization) 기능 써보기
 tokenized = spacy_en.tokenizer("I am a graduate student.")
 
 for i, token in enumerate(tokenized):
     print(f"인덱스 {i}: {token.text}")
+'''
 
-# 독일어(Deutsch) 문장을 토큰화 하는 함수 (순서를 뒤집지 않음)
-def tokenize_de(text):
-    return [token.text for token in spacy_de.tokenizer(text)]
-
-# def tokenize_de(text): # 단어단위 일반 토크나이저 사용 해보기
-#     return [token for token in word_tokenize(text)]
-
-# 영어(English) 문장을 토큰화 하는 함수
+# 영어(English) 문장을 토큰화 하는 함수 (순서를 뒤집지 않음)
 def tokenize_en(text):
     return [token.text for token in spacy_en.tokenizer(text)]
 
-# def tokenize_en(text): # 단어단위 일반 토크나이저 사용 해보기
-#     return [token for token in word_tokenize(text)]
+# 독일어(Deutsch) 문장을 토큰화 하는 함수 
+def tokenize_de(text):
+    return [token.text for token in spacy_de.tokenizer(text)]
+
 
 from torchtext.data import Field, BucketIterator
 
-SRC = Field(tokenize=tokenize_de, init_token="<sos>", eos_token="<eos>", lower=True, batch_first=True)
-TRG = Field(tokenize=tokenize_en, init_token="<sos>", eos_token="<eos>", lower=True, batch_first=True)
+SRC = Field(tokenize=tokenize_en, init_token="<sos>", eos_token="<eos>", lower=True, batch_first=True)
+TRG = Field(tokenize=tokenize_de, init_token="<sos>", eos_token="<eos>", lower=True, batch_first=True)
 # batch가 첫번째 차원
 
 from torchtext.datasets import Multi30k # 단어풀 쉽게 다운받아 사용 가능
 
-train_dataset, valid_dataset, test_dataset = Multi30k.splits(exts=(".de", ".en"), fields=(SRC, TRG))
+train_dataset, valid_dataset, test_dataset = Multi30k.splits(exts=(".en", ".de"), fields=(SRC, TRG))
     
 print(f"학습 데이터셋(training dataset) 크기: {len(train_dataset.examples)}개")
 print(f"평가 데이터셋(validation dataset) 크기: {len(valid_dataset.examples)}개")
@@ -525,8 +522,8 @@ class Transformer(nn.Module):
 INPUT_DIM = len(SRC.vocab)  # 독일어 단어사전 개수
 OUTPUT_DIM = len(TRG.vocab) # 영어 단어사전 개수
 HIDDEN_DIM = 256    # 전체 디멘션
-ENC_LAYERS = 3      # 인코더 레이어 개수
-DEC_LAYERS = 3      # 디코더 레이어 개수
+ENC_LAYERS = 4      # 인코더 레이어 개수
+DEC_LAYERS = 4      # 디코더 레이어 개수
 ENC_HEADS = 8       # 헤드 개수
 DEC_HEADS = 8
 ENC_PF_DIM = 512    # 포지션 임베딩 차원
@@ -658,8 +655,8 @@ def epoch_time(start_time, end_time):
     elapsed_secs = int(elapsed_time - (elapsed_mins * 60))
     return elapsed_mins, elapsed_secs
 
-# '''
-N_EPOCHS = 5
+'''
+N_EPOCHS = 10
 CLIP = 1
 best_valid_loss = float('inf') # 양의 무한대부터 시작
 
@@ -799,7 +796,9 @@ def display_attention(sentence, translation, attention, n_heads=8, n_rows=4, n_c
     
 example_idx = 10
 # src = vars(test_dataset.examples[example_idx])['src']
-src = tokenize_de('eine Mutter ist freundlich.')    # 번역할 문장
+# src = tokenize_de('We became four people.')    # 번역할 문장
+# src = tokenize_de('There are four people in my team.')
+src = tokenize_de('two dogs are playing in the snow.')
 
 # trg = vars(test_dataset.examples[example_idx])['trg']
 

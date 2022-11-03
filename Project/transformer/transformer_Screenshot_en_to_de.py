@@ -8,51 +8,30 @@ import random
 
 import spacy
 import en_core_web_sm
-from nltk.tokenize import word_tokenize
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-spacy_en = en_core_web_sm.load() # 영어 toknizer
-spacy_de = spacy.load('de_core_news_sm') # 독일어 toknizer
+spacy_en = en_core_web_sm.load() # 영어 tokenizer
+spacy_de = spacy.load('de_core_news_sm') # 독일어 tokenizer
 
-# 간단히 토큰화(tokenization) 기능 써보기
-tokenized = spacy_en.tokenizer("I am a graduate student.")
-
-for i, token in enumerate(tokenized):
-    print(f"인덱스 {i}: {token.text}")
-
-# 독일어(Deutsch) 문장을 토큰화 하는 함수 (순서를 뒤집지 않음)
-def tokenize_de(text):
-    return [token.text for token in spacy_de.tokenizer(text)]
-
-# def tokenize_de(text): # 단어단위 일반 토크나이저 사용 해보기
-#     return [token for token in word_tokenize(text)]
-
-# 영어(English) 문장을 토큰화 하는 함수
 def tokenize_en(text):
     return [token.text for token in spacy_en.tokenizer(text)]
 
-# def tokenize_en(text): # 단어단위 일반 토크나이저 사용 해보기
-#     return [token for token in word_tokenize(text)]
+def tokenize_de(text):
+    return [token.text for token in spacy_de.tokenizer(text)]
 
 from torchtext.data import Field, BucketIterator
 
-SRC = Field(tokenize=tokenize_de, init_token="<sos>", eos_token="<eos>", lower=True, batch_first=True)
-TRG = Field(tokenize=tokenize_en, init_token="<sos>", eos_token="<eos>", lower=True, batch_first=True)
-# batch가 첫번째 차원
+SRC = Field(tokenize=tokenize_en, init_token="<sos>", eos_token="<eos>", lower=True, batch_first=True)
+TRG = Field(tokenize=tokenize_de, init_token="<sos>", eos_token="<eos>", lower=True, batch_first=True)
 
-from torchtext.datasets import Multi30k # 단어풀 쉽게 다운받아 사용 가능
+from torchtext.datasets import Multi30k
 
-train_dataset, valid_dataset, test_dataset = Multi30k.splits(exts=(".de", ".en"), fields=(SRC, TRG))
+train_dataset, valid_dataset, test_dataset = Multi30k.splits(exts=(".en", ".de"), fields=(SRC, TRG))
     
-print(f"학습 데이터셋(training dataset) 크기: {len(train_dataset.examples)}개")
-print(f"평가 데이터셋(validation dataset) 크기: {len(valid_dataset.examples)}개")
-print(f"테스트 데이터셋(testing dataset) 크기: {len(test_dataset.examples)}개")
-
-# 학습 데이터 중 하나를 선택해 출력
-print(vars(train_dataset.examples[30])['src'])
-print(vars(train_dataset.examples[30])['trg'])
-
+# 학습 데이터셋(training dataset) 크기: 29000개
+# 평가 데이터셋(validation dataset) 크기: 1014개
+# 테스트 데이터셋(testing dataset) 크기: 1000개
 
 # 최소 두번 이상 등장한 단어에 대해서만 vcab 에 추가함
 SRC.build_vocab(train_dataset, min_freq=2)
@@ -98,24 +77,20 @@ class MultiHeadAttentionLayer(nn.Module):
         super().__init__()
 
         assert hidden_dim % n_heads == 0
-        # hidden_dim 이 n_heads로 나누어 떨어져야만 함. 그래야 n_head x head_dim = hidden_dim
-        # n_head : 어텐션 헤드 개수
-        # head_dim : 각 헤드의 디멘션
-        # hidden_dim : 모든 어텐션의 디멘션
 
-        self.hidden_dim = hidden_dim # 임베딩 차원
-        self.n_heads = n_heads # 헤드(head)의 개수: 서로 다른 어텐션(attention) 컨셉의 수
-        self.head_dim = hidden_dim // n_heads # 각 헤드(head)에서의 임베딩 차원
+        self.hidden_dim = hidden_dim # d_model 차원
+        self.n_heads = n_heads # head의 개수: 서로 다른 어텐션(attention) 수
+        self.head_dim = hidden_dim // n_heads # 각 head의 차원
 
-        self.fc_q = nn.Linear(hidden_dim, hidden_dim) # Query 값에 적용될 FC 레이어
-        self.fc_k = nn.Linear(hidden_dim, hidden_dim) # Key 값에 적용될 FC 레이어
-        self.fc_v = nn.Linear(hidden_dim, hidden_dim) # Value 값에 적용될 FC 레이어
+        self.fc_q = nn.Linear(hidden_dim, hidden_dim)
+        self.fc_k = nn.Linear(hidden_dim, hidden_dim)
+        self.fc_v = nn.Linear(hidden_dim, hidden_dim)
 
-        self.fc_o = nn.Linear(hidden_dim, hidden_dim) # 임베딩 디멘션, 원래 모양
+        self.fc_o = nn.Linear(hidden_dim, hidden_dim)
 
         self.dropout = nn.Dropout(dropout_ratio)
 
-        self.scale = torch.sqrt(torch.FloatTensor([self.head_dim])).to(device) # 어텐션에너지값을 소프트맥스 전 나누는 용도
+        self.scale = torch.sqrt(torch.FloatTensor([self.head_dim])).to(device)
 
     def forward(self, query, key, value, mask = None):
 
@@ -134,11 +109,10 @@ class MultiHeadAttentionLayer(nn.Module):
         # V: [batch_size, value_len, hidden_dim]
 
         # hidden_dim → n_heads X head_dim 형태로 변형
-        # n_heads(h)개의 서로 다른 어텐션(attention) 컨셉을 학습하도록 유도
+        # n_heads(h)개의 어텐션(attention)
         Q = Q.view(batch_size, -1, self.n_heads, self.head_dim).permute(0, 2, 1, 3)
         K = K.view(batch_size, -1, self.n_heads, self.head_dim).permute(0, 2, 1, 3)
         V = V.view(batch_size, -1, self.n_heads, self.head_dim).permute(0, 2, 1, 3)
-        # permute(): 다차원 행렬전치에 사용. transpose()는 permute()의 두개만 쓰는 버전임
 
         # Q: [batch_size, n_heads, query_len, head_dim]
         # K: [batch_size, n_heads, key_len, head_dim]
@@ -149,47 +123,31 @@ class MultiHeadAttentionLayer(nn.Module):
 
         # energy: [batch_size, n_heads, query_len, key_len]
 
-        # 마스크(mask)를 사용하는 경우, encoder에서도 사용하는 이유는 여기서는 0이 없는 단어, 1이 패딩이라 패딩부분을 0으로 처리하기 위함임
         if mask is not None:
             energy = energy.masked_fill(mask==0, -1e10)
-        # 마스크(mask) 값이 0인 부분을 -1e10으로 채우기 - softmax 이후 0%가 되도록
-        # 마스크 벡터는 trg_pad_mask 에 저장시켜 사용하는데
-        """ (마스크 예시)
-        1 0 0 0 0
-        1 1 0 0 0
-        1 1 1 0 0
-        1 1 1 1 0
-        1 1 1 1 1
-        """
-        # 이 모양으로 되어있음
         
-        # 어텐션(attention) 스코어 계산: 각 단어에 대한 확률 값
+        # 어텐션(attention) 스코어 계산
         attention = torch.softmax(energy, dim=-1)
         # attention: [batch_size, n_heads, query_len, key_len]   query_len = key_len
 
-        # 여기에서 Scaled Dot-Product Attention을 계산 = attention value 값
+        # Scaled Dot-Product Attention 계산
         x = torch.matmul(self.dropout(attention), V)
 
         # x: [batch_size, n_heads, query_len, head_dim]
 
         x = x.permute(0, 2, 1, 3).contiguous()
-        # contiguous(): 행렬 전치할 때 메모리 상 저장 형태를 바꾸는데
-        # 자동으로 될 수도 있고 아닐 수도 있음. 자동으로 안되면 저거 붙여주면 됨
 
         # x: [batch_size, query_len, n_heads, head_dim] <<
 
-        x = x.view(batch_size, -1, self.hidden_dim) # 콘캣
-        # view(): 토치에서 이 함수는 다차원 행렬을 저차원 행렬로 변환해줌
+        x = x.view(batch_size, -1, self.hidden_dim) # concat
 
-        # x: [batch_size, query_len, hidden_dim] << 변경되는 부분 참고     n_heads x head_dim = hidden_dim
-        # 이 모양은 처음에 넣었던 각 키, 쿼리, 밸류 모양과 동일함
+        # x: [batch_size, query_len, hidden_dim] <<
 
         x = self.fc_o(x)
-        # 원래 모양만든거 가지고 리니어 한번 통과해서 weight값 곱해준 것 - feedforward network 부분
 
         # x: [batch_size, query_len, hidden_dim]
 
-        return x, attention # 한개의 어텐션자체와 어텐션스코어값(확률값)을 따로 뽑아 시각화에 사용
+        return x, attention
 
 
 class PositionwiseFeedforwardLayer(nn.Module):
@@ -213,9 +171,6 @@ class PositionwiseFeedforwardLayer(nn.Module):
 
         # x: [batch_size, seq_len, hidden_dim]
         
-        # 걍 렐루한번, 리니어한번 때려 나감. 포지션 벡터 차원을 하나 정해주고 그 벡터에 맞춰서 각 값의 자리별로 서로 다른 값을 갖도록 한 후
-        # 다시 원래 모양으로 되돌려 나감. 그러면 각 자리의 값들은 위치벡터값을 간직하고 있는 채로 모양만 원래 모양으로 변경됨
-
         return x
 
 class EncoderLayer(nn.Module):
@@ -228,21 +183,16 @@ class EncoderLayer(nn.Module):
         self.positionwise_feedforward = PositionwiseFeedforwardLayer(hidden_dim, pf_dim, dropout_ratio)
         self.dropout = nn.Dropout(dropout_ratio)
 
-    # 하나의 임베딩이 복제되어 Query, Key, Value로 입력되는 방식
     def forward(self, src, src_mask):
 
         # src: [batch_size, src_len, hidden_dim]
         # src_mask: [batch_size, src_len]
 
         # self attention
-        # 필요한 경우 마스크(mask) 행렬을 이용하여 어텐션(attention)할 단어를 조절 가능
         _src, _ = self.self_attention(src, src, src, src_mask)
-        # self-attention 이므로 _src 에는 src키, src쿼리, src밸류
 
         # dropout, residual connection and layer norm
         src = self.self_attn_layer_norm(src + self.dropout(_src))
-        # 어텐션 전 입력값과 어텐션 후 입력값 더하고 layer nomalization
-        # 이유는 어텐션 전 후 레이어들의 값의 편차가 클 수 있기 때문에 더하고 정규화 한번 하는 것 같음
 
         # src: [batch_size, src_len, hidden_dim]
 
@@ -659,7 +609,7 @@ def epoch_time(start_time, end_time):
     return elapsed_mins, elapsed_secs
 
 # '''
-N_EPOCHS = 5
+N_EPOCHS = 20
 CLIP = 1
 best_valid_loss = float('inf') # 양의 무한대부터 시작
 
@@ -799,7 +749,7 @@ def display_attention(sentence, translation, attention, n_heads=8, n_rows=4, n_c
     
 example_idx = 10
 # src = vars(test_dataset.examples[example_idx])['src']
-src = tokenize_de('eine Mutter ist freundlich.')    # 번역할 문장
+src = tokenize_de('I like a car.')    # 번역할 문장
 
 # trg = vars(test_dataset.examples[example_idx])['trg']
 
