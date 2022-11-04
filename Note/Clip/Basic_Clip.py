@@ -14,29 +14,15 @@ import torch.nn.functional as F
 import timm
 from transformers import DistilBertModel, DistilBertConfig, DistilBertTokenizer
 
-dataset = "8k"
 
-if dataset == "8k":
-    df = pd.read_csv("D:/_AIA_Team_Project_Data/Image_Captioning/_data/Flickr8k/captions.txt") # txt파일을 csv형식으로 불러온다 , 기준으로 colum 나눔
-    df['id'] = [id_ for id_ in range(df.shape[0] // 5) for _ in range(5)]
-    df.to_csv("D:/_AIA_Team_Project_Data/Image_Captioning/_data/Flickr8k/captions.csv", index=False)
-    df = pd.read_csv("D:/_AIA_Team_Project_Data/Image_Captioning/_data/Flickr8k/captions.csv")
-    image_path = "D:/_AIA_Team_Project_Data/Image_Captioning/_data/Flickr8k/Images"
-    captions_path = "D:/_AIA_Team_Project_Data/Image_Captioning/_data/Flickr8k/"
+df = pd.read_csv("D:/_AIA_Team_Project_Data/Image_Captioning/_data/Flickr8k/captions.txt") # txt파일을 csv형식으로 불러온다 , 기준으로 colum 나눔
+df['id'] = [id_ for id_ in range(df.shape[0] // 5) for _ in range(5)]
+df.to_csv("D:/_AIA_Team_Project_Data/Image_Captioning/_data/Flickr8k/captions.csv", index=False)
+df = pd.read_csv("D:/_AIA_Team_Project_Data/Image_Captioning/_data/Flickr8k/captions.csv")
+image_path = "D:/_AIA_Team_Project_Data/Image_Captioning/_data/Flickr8k/Images"
+captions_path = "D:/_AIA_Team_Project_Data/Image_Captioning/_data/Flickr8k/"
     
-elif dataset == "30k":
-    df = pd.read_csv("D:/_AIA_Team_Project_Data/Image_Captioning/_data/Flickr30k/results.csv", delimiter="|")
-    df.columns = ['image', 'caption_number', 'caption']
-    df['caption'] = df['caption'].str.lstrip()
-    df['caption_number'] = df['caption_number'].str.lstrip()
-    df.loc[19999, 'caption_number'] = "4"
-    df.loc[19999, 'caption'] = "A dog runs across the grass ."
-    ids = [id_ for id_ in range(len(df) // 5) for _ in range(5)]
-    df['id'] = ids
-    df.to_csv("captions.csv", index=False)
-    image_path = "/content/flickr30k_images/flickr30k_images"
-    captions_path = "D:/_AIA_Team_Project_Data/Image_Captioning/_data/Flickr30k"
-    
+
 print(df.head())
 
 class CFG:

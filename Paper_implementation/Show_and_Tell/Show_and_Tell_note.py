@@ -17,36 +17,31 @@ from keras.layers import Input, Dense, LSTM, Embedding, Dropout, add
 BASE_DIR = 'D:\_AIA_Team_Project_Data\_captioning_data\Flickr30k'
 WORKING_DIR = 'D:\_AIA_Team_Project_Data\_captioning_save\Flickr30k'
 
+data_path = 'D:\_AIA_Team_Project_Data\Image_Captioning\_data\Flickr8k/Images'
 
+# Encoder RNN -> Encoder CNN
 model = InceptionV3()
 model = Model(inputs=model.inputs, outputs=model.layers[-1].output)
 
-# summarize
-model.summary()
-# extract features from image
+# model.summary()
 
+
+
+'''
 features = {}
 directory = os.path.join('D:\_AIA_Team_Project_Data\Image_Captioning\_data\Flickr8k/Images')
 
 for img_name in tqdm(os.listdir(directory)):
-    # load the image from file
     img_path = directory + '/' + img_name
     image = load_img(img_path, target_size=(299, 299))
-    # convert image pixels to numpy array
     image = img_to_array(image)
-    # reshape data for model
-    image = image.reshape((1, image.shape[0], image.shape[1], image.shape[2]))
-    
-    # preprocess image for vgg
-    # print(np.max(image), np.min(image)) # 각 픽셀 채널 범위 0 ~ 255 (원본 이미지 포멧)
+    image = image.reshape((1,
+                           image.shape[0],
+                           image.shape[1],
+                           image.shape[2]))
     image = preprocess_input(image)
-    # print(np.max(image), np.min(image)) # 각 픽셀 채널 범위 -151 ~ 151 (이미지넷 대회에서 사용하는 이미지 포맷)
-    
-    # extract features
     feature = model.predict(image, verbose=1)
-    # get image ID
     image_id = img_name.split('.')[0]
-    # store feature
     features[image_id] = feature
     
 # print(features)
@@ -55,7 +50,7 @@ pickle.dump(features, open(os.path.join('D:\_AIA_Team_Project_Data\Image_Caption
 
 print('img processing done.')
 
-
+'''
 # load features from pickle
 with open(os.path.join('D:\_AIA_Team_Project_Data\Image_Captioning\_paper/paper_features_8k.pkl'), 'rb') as f:
     features = pickle.load(f)
@@ -169,40 +164,38 @@ test = image_ids[split:]
 # <start> girl going into wooden building      end
 
 
-# create data generator to get data in batch (avoids session crash)
-def data_generator(data_keys, mapping, features, tokenizer, max_length, vocab_size, batch_size):
-    # loop over images
+
+
+
+
+def data_generator(data_keys,mapping, features, tokenizer, max_length,vocab_size,
+                   batch_size) :
     X1, X2, y = list(), list(), list()
-    n = 0
 
     for key in data_keys:
         n += 1
         captions = mapping[key]
-        # process each caption
         for caption in captions:
-            # encode the sequence
-            seq = tokenizer.texts_to_sequences([caption])[0] # 리스트 안에 넣고 (한문장씩 들어가 있으니까)
-                                                                # 첫문장을 토크나이징하는 것으로 해야함
-            # split the sequence into X, y pairs
+            seq = tokenizer.texts_to_sequences([caption])[0] 
             for i in range(1, len(seq)):
-                # split into input and output pairs
-                in_seq, out_seq = seq[:i], seq[i] # 현재 문장을 인풋으로, 다음에 올 단어를 아웃풋으로
-                # pad input sequence
-                in_seq = pad_sequences([in_seq], maxlen=max_length)[0] # 최대 문장 길이만큼 패딩(0을 앞쪽에 채움)
-                # encode output sequence
-                out_seq = to_categorical([out_seq], num_classes=vocab_size)[0] 
-                # 마지막에 소프트맥스값으로 뽑긴 함. 근데 여기서 원핫을 때린다고 원핫밸류가 다르게 찍히는게 이해가 안가는게
-                # 여기선 지금 한문장따리만 투카테고리컬에 들어가거든? 그러면 투카테고리컬이 이전 밸류들을 다 기억을 하고 있다는 소린거 같은데 그런가봄
-                
-                # store the sequences
-                X1.append(features[key][0]) # features 에 하나의 key에 해당하는 이미지 피쳐가 리스트로 묶여있기 때문에 인덱스로 부름
+                in_seq, out_seq = seq[:i], seq[i] 
+                in_seq = pad_sequences([in_seq],maxlen=max_length)[0]
+                out_seq = to_categorical([out_seq],
+                                         num_classes=vocab_size)[0] 
+                X1.append(features[key][0]) 
                 X2.append(in_seq)
                 y.append(out_seq)
-        if n == batch_size: # 배치 사이즈만큼 차면 yield로 한묶음 채워서 뱉음
+        if n == batch_size :
             X1, X2, y = np.array(X1), np.array(X2), np.array(y)
             yield [X1, X2], y
             X1, X2, y = list(), list(), list()
             n = 0
+
+
+
+
+
+
 
 # yield 는 해당 함수가 반복문을 통해 실행 될때마다 차례대로 값을 뱉도록 해준다
 # 즉 현재 함수 내에서 while문으로 생성된 yield는 제너레이터형식 주소 안에 차곡차곡 쌓이게 되고
@@ -220,27 +213,35 @@ def data_generator(data_keys, mapping, features, tokenizer, max_length, vocab_si
   
 # encoder model
 # image feature layers
-inputs1 = Input(shape=(1000,))
-fe1 = Dropout(0.4)(inputs1)
-fe2 = Dense(256, activation='relu')(fe1)
+
+
+
+
+
+
+# image fature layers
+image_input = Input(shape=(1000,))
+hd1_1 = Dropout(0.4)(image_input)
+hd1_2 = Dense(256, activation='relu')(hd1_1)
+
 # sequence feature layers
-inputs2 = Input(shape=(max_length,))
-se1 = Embedding(vocab_size, 256, mask_zero=True)(inputs2)
-se2 = Dropout(0.4)(se1)
-se3 = Dense(256)(se2)
-# se3 = LSTM(256)(se2)
+sequence_input = Input(shape=(max_length,))
+hd2_1 = Embedding(vocab_size, 256, mask_zero=True)(sequence_input)
+hd2_2 = Dropout(0.4)(hd2_1)
+hd2_3 = Dense(256)(hd2_2)
 
-# decoder model
+# decoder 
+decoder1 = add([hd1_2, hd2_3])
+decoder2 = LSTM(512, return_sequences=True)(decoder1)
+decoder3 = LSTM(512)(decoder2)
+decoder4 = Dense(128, activation='relu')(decoder3)
+outputs = Dense(vocab_size, activation='softmax')(decoder4)  
 
-decoder1 = add([fe2, se3])
-decoder2 = LSTM(256)(decoder1)
-# decoder3 = LSTM(16, return_sequences=True)(decoder2)
-# decoder4 = LSTM(8)(decoder3)
-decoder3 = Dense(128, activation='relu')(decoder2)
-outputs = Dense(vocab_size, activation='softmax')(decoder3)  
-
-model = Model(inputs=[inputs1, inputs2], outputs=outputs)
+model = Model(inputs=[image_input, sequence_input], outputs=outputs)
 model.compile(loss='categorical_crossentropy', optimizer='adam')
+
+
+
 
 
 # train the model
@@ -315,7 +316,7 @@ def predict_caption(model, image, tokenizer, max_length): # 여기서 image 자�
 
 
 
-image = load_img('D:\_AIA_Team_Project_Data\Image_Captioning\_test/0.JPG', target_size=(299, 299))
+image = load_img('D:\_AIA_Team_Project_Data\Image_Captioning\_test/1.JPG', target_size=(299, 299))
 # convert image pixels to numpy array
 image = img_to_array(image)
 # reshape data for model
@@ -335,6 +336,7 @@ print(y_pred)
             
 
 '''
+print('Bleu start')
 from nltk.translate.bleu_score import corpus_bleu
 # validate with test data
 actual, predicted = list(), list()
@@ -353,14 +355,37 @@ for idx, image_id in enumerate(test):
   predicted.append(y_pred)
   print(actual_captions)
   print(y_pred)
+  
 
-# calcuate BLEU score
 
-print("BLEU-1: %f" % corpus_bleu(actual, predicted, weights=(1.0, 0, 0, 0)))      
+
+# BLEU score
+# actual captions
+[['man in pink shirt climbs rock face'],
+ ['man is rock climbing high in the air'],
+ ['person in red shirt climbing up rock face covered in assist handles'],
+ ['rock climber in red shirt'],
+ ['rock climber practices on rock climbing wall']]
+
+# predict captions
+['man in red shirt is standing in front of crowd']
+
+print("BLEU-1: %f" % corpus_bleu(actual, predicted,weights=(1.0, 0, 0, 0)))      
 print("BLEU-2: %f" % corpus_bleu(actual, predicted, weights=(0.5, 0.5, 0, 0))) 
 print("BLEU-3: %f" % corpus_bleu(actual, predicted, weights=(0.25, 0.5, 0.25, 0))) 
 print("BLEU-4: %f" % corpus_bleu(actual, predicted, weights=(0.25, 0.25, 0.25, 0.25))) 
 '''
+# BLEU-1: 0.456693
+# BLEU-2: 0.206605
+# BLEU-3: 0.102904
+# BLEU-4: 0.055527
+
+
+
+
+
+
+
 '''
 
 [['startseq', 'a', 'man', 'in', 'a', 'pink', 'shirt', 'climbs', 'a', 'rock', 'face', 'endseq'],
@@ -372,3 +397,14 @@ print("BLEU-4: %f" % corpus_bleu(actual, predicted, weights=(0.25, 0.25, 0.25, 0
 ['startseq', 'a', 'man', 'is', 'climbing', 'a', 'rock', 'wall', 'endseq']
  
 '''
+
+
+
+
+
+
+
+
+
+
+
