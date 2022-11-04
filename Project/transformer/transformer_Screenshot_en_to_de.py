@@ -747,14 +747,8 @@ def display_attention(sentence, translation, attention, n_heads=8, n_rows=4, n_c
 
     plt.show()
     
-example_idx = 10
-# src = vars(test_dataset.examples[example_idx])['src']
-src = tokenize_de('I like a car.')    # 번역할 문장
-
-# trg = vars(test_dataset.examples[example_idx])['trg']
-
+src = tokenize_de('two dogs are playing in the snow.')    # 번역할 문장
 print(f'소스 문장: {src}')
-# print(f'타겟 문장: {trg}')
 
 translation, attention = translate_sentence(src, SRC, TRG, model, device, logging=True)
 
