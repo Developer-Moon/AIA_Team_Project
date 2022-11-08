@@ -4,10 +4,10 @@ import numpy as np
 import time
 from tqdm.notebook import tqdm
 
-from keras.applications.vgg16 import VGG16, preprocess_input
-from keras.preprocessing.image import load_img, img_to_array
+from tensorflow.keras.applications.vgg16 import VGG16, preprocess_input
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
 from keras.preprocessing.text import Tokenizer
-from keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 from keras.models import Model, load_model
 from tensorflow.keras.utils import to_categorical
 from keras.layers import Input, Dense, LSTM, Embedding, Dropout, add
@@ -18,8 +18,9 @@ WORKING_DIR = 'D:\_AIA_Team_Project_Data\_captioning_save\Flickr30k'
 
 model = VGG16()
 model = Model(inputs=model.inputs, outputs=model.layers[-2].output)
+
 # summarize
-# model.summary()
+model.summary()
 # extract features from image
 '''
 features = {}
