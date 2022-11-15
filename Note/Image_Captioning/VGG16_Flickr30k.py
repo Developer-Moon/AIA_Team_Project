@@ -5,9 +5,9 @@ import time
 from tqdm.notebook import tqdm
 
 from keras.applications.vgg16 import VGG16, preprocess_input
-from keras.preprocessing.image import load_img, img_to_array
-from keras.preprocessing.text import Tokenizer
-from keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 from keras.models import Model, load_model
 from tensorflow.keras.utils import to_categorical
 from keras.layers import Input, Dense, LSTM, Embedding, Dropout, add
@@ -56,11 +56,11 @@ print('img processing done.')
 '''
 
 # load features from pickle
-with open(os.path.join(WORKING_DIR, 'features.pkl'), 'rb') as f:
+with open(os.path.join('D:\_AIA_Team_Project_Data\Image_Captioning\_save\Flickr30k/features.pkl'), 'rb') as f:
     features = pickle.load(f)
     
     
-with open(os.path.join('D:\_AIA_Team_Project_Data\_captioning_data\Flickr30k/captions.txt'), 'r', encoding='UTF-8') as f : # , encoding='UTF-8'
+with open(os.path.join('D:\_AIA_Team_Project_Data\Image_Captioning\_data\Flickr30k/captions.txt'), 'r', encoding='UTF-8') as f : # , encoding='UTF-8'
     next(f) # 첫줄 빼고 읽어오기
     captions_doc = f.read()
 # print(captions_doc)
@@ -311,7 +311,7 @@ def predict_caption(model, image, tokenizer, max_length): # 여기서 image 자�
 
 
 
-image = load_img('C:\AIA_Team_Project\Image_Captioning\caption_test/IMG_0188.JPG', target_size=(224, 224))
+image = load_img('D:\_AIA_Team_Project_Data\Image_Captioning\_test/1.JPG', target_size=(224, 224))
 # convert image pixels to numpy array
 image = img_to_array(image)
 # reshape data for model
@@ -323,7 +323,7 @@ model = Model(inputs=model.inputs, outputs=model.layers[-2].output)
 predic_features = model.predict(image, verbose=1)
 
 print('prediction..')
-model = load_model(WORKING_DIR+'/VGG16_Flickr30k_Model_LSTM_01.h5')
+model = load_model('D:\_AIA_Team_Project_Data\Image_Captioning\_save\Flickr30k/VGG16_Flickr30k_Model_LSTM_01.h5')
 y_pred = predict_caption(model, predic_features, tokenizer, max_length)
 # y_pred = y_pred.replace('start', '')
 # y_pred = y_pred.replace('end', '')

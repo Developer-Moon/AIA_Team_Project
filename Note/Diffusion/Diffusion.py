@@ -1,20 +1,22 @@
 import math
 import matplotlib.pyplot as plt
 import tensorflow as tf
-import tensorflow_datasets as tfds # pip install tensorflow_datasets
+import tensorflow_datasets as tfds
 
 from tensorflow import keras
 from keras import layers
 
-''''Hyperparameterers'''
-# data
+
+
+
+
+"""Hyperparameterers"""
 dataset_name = "oxford_flowers102"
 dataset_repetitions = 5
-num_epochs = 1  # 좋은결과를 위해선 최소 50번 훈련
-image_size = 64
-
+num_epochs = 20  # train for at least 50 epochs for good results
+image_size = 64 # 64
 # KID = Kernel Inception Distance, see related section
-kid_image_size = 75
+kid_image_size = 75 # 고정
 kid_diffusion_steps = 5
 plot_diffusion_steps = 20
 
@@ -29,13 +31,14 @@ widths = [32, 64, 96, 128]
 block_depth = 2
 
 # optimization
-batch_size = 64
+batch_size = 64 # 64
 ema = 0.999
 learning_rate = 1e-3
 weight_decay = 1e-4
 
 
-'''Data pipeline'''
+
+"""Data pipeline"""
 def preprocess_image(data):
     # center crop image
     height = tf.shape(data["image"])[0]
@@ -75,7 +78,7 @@ val_dataset = prepare_dataset("train[80%:]+validation[80%:]+test[80%:]")
 
 
 
-'''Kernel inception distance 성능평가?'''
+"""Kernel inception distance"""
 class KID(keras.metrics.Metric):
     def __init__(self, name, **kwargs):
         super().__init__(name=name, **kwargs)
@@ -139,7 +142,8 @@ class KID(keras.metrics.Metric):
         self.kid_tracker.reset_state()
         
         
-'''Network architecture'''
+        
+"""Network architecture"""
 def sinusoidal_embedding(x):
     embedding_min_frequency = 1.0
     frequencies = tf.exp(
@@ -223,7 +227,8 @@ def get_network(image_size, widths, block_depth):
     return keras.Model([noisy_images, noise_variances], x, name="residual_unet")
 
 
-'''Diffusion model'''
+
+"""Diffusion model"""
 class DiffusionModel(keras.Model):
     def __init__(self, image_size, widths, block_depth):
         super().__init__()
@@ -262,23 +267,23 @@ class DiffusionModel(keras.Model):
 
         return noise_rates, signal_rates
 
-    def denoise(self, noisy_images, noise_rates, signal_rates, training):
+    def denoise(self, noisy_images, noise_rates, signal_rates, training) : # 중요한부분!!  
         # the exponential moving average weights are used at evaluation
-        if training:
-            network = self.network
+        if training : # training와 inference때 다른 network를 사용(이유는 안나옴 영상 44분대)
+            network = self.network 
         else:
             network = self.ema_network
 
         # predict noise component and calculate the image component using it
-        pred_noises = network([noisy_images, noise_rates**2], training=training)
+        pred_noises = network([noisy_images, noise_rates**2], training=training) # noise_rates는 시점마다 다르다
         pred_images = (noisy_images - noise_rates * pred_noises) / signal_rates
 
-        return pred_noises, pred_images
+        return pred_noises, pred_images # 노이즈와 디노이징된 이미지 출력
 
-    def reverse_diffusion(self, initial_noise, diffusion_steps):
+    def reverse_diffusion(self, initial_noise, diffusion_steps) :
         # reverse diffusion = sampling
         num_images = initial_noise.shape[0]
-        step_size = 1.0 / diffusion_steps
+        step_size = 1.0 / diffusion_steps # 시점 1부터 0까지
 
         # important line:
         # at the first sampling step, the "noisy image" is pure noise
@@ -314,18 +319,18 @@ class DiffusionModel(keras.Model):
         generated_images = self.denormalize(generated_images)
         return generated_images
 
-    def train_step(self, images):
+    def train_step(self, images) : # 중요한 부분, images 진짜 이미지를 받는다
         # normalize images to have standard deviation of 1, like the noises
         images = self.normalizer(images, training=True)
-        noises = tf.random.normal(shape=(batch_size, image_size, image_size, 3))
+        noises = tf.random.normal(shape=(batch_size, image_size, image_size, 3)) # tf.random.normal로 샘플링
 
         # sample uniform random diffusion times
-        diffusion_times = tf.random.uniform(
+        diffusion_times = tf.random.uniform( # 0과 1사이
             shape=(batch_size, 1, 1, 1), minval=0.0, maxval=1.0
         )
         noise_rates, signal_rates = self.diffusion_schedule(diffusion_times)
         # mix the images with noises accordingly
-        noisy_images = signal_rates * images + noise_rates * noises
+        noisy_images = signal_rates * images + noise_rates * noises # 노이즈 이미지 만드는 곳
 
         with tf.GradientTape() as tape:
             # train the network to separate noisy images to their components
@@ -336,11 +341,11 @@ class DiffusionModel(keras.Model):
             noise_loss = self.loss(noises, pred_noises)  # used for training
             image_loss = self.loss(images, pred_images)  # only used as metric
 
-        gradients = tape.gradient(noise_loss, self.network.trainable_weights)
+        gradients = tape.gradient(noise_loss, self.network.trainable_weights)  # 그라디언트 부분
         self.optimizer.apply_gradients(zip(gradients, self.network.trainable_weights))
 
-        self.noise_loss_tracker.update_state(noise_loss)
-        self.image_loss_tracker.update_state(image_loss)
+        self.noise_loss_tracker.update_state(noise_loss) # 업데이트 하는 부분
+        self.image_loss_tracker.update_state(image_loss) # 업데이트 하는 부분
 
         # track the exponential moving averages of weights
         for weight, ema_weight in zip(self.network.weights, self.ema_network.weights):
@@ -402,17 +407,19 @@ class DiffusionModel(keras.Model):
         plt.close()
         
         
-'''Training'''        
+"""Training"""
 # create and compile the model
 model = DiffusionModel(image_size, widths, block_depth)
 # below tensorflow 2.9:
 # pip install tensorflow_addons
 # import tensorflow_addons as tfa
 # optimizer=tfa.optimizers.AdamW
-model.compile(
-    optimizer=keras.optimizers.experimental.AdamW(
-        learning_rate=learning_rate, weight_decay=weight_decay
-    ),
+from tensorflow.python.keras.optimizer_v2.adam import Adam
+
+model.compile(optimizer='adam',
+    # optimizer=keras.optimizers.experimental.AdamW(
+    #     learning_rate=learning_rate, weight_decay=weight_decay
+    
     loss=keras.losses.mean_absolute_error,
 )
 # pixelwise mean absolute error is used as loss
@@ -430,19 +437,13 @@ checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
 # calculate mean and variance of training dataset for normalization
 model.normalizer.adapt(train_dataset)
 
-
-
-'''터집니다
 # run training and plot generated images periodically
-model.fit(train_dataset,
-          epochs=num_epochs,
-          validation_data=val_dataset,
-          callbacks=[keras.callbacks.LambdaCallback(on_epoch_end=model.plot_images), checkpoint_callback,]
-)
+model.fit(
+    train_dataset,
+    epochs=num_epochs,
+    validation_data=val_dataset,
+    callbacks=[checkpoint_callback,] # keras.callbacks.LambdaCallback(on_epoch_end=model.plot_images)
+    )
 
-
-Inference
-# load the best model and generate images
 model.load_weights(checkpoint_path)
 model.plot_images()
-'''

@@ -1,7 +1,7 @@
 from keras.applications.vgg16 import VGG16, preprocess_input
-from keras.preprocessing.image import load_img, img_to_array
-from keras.preprocessing.sequence import pad_sequences
-from keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.preprocessing.text import Tokenizer
 from keras.models import Model, load_model
 from tensorflow.keras.utils import to_categorical
 from keras.layers import Input, Dense, LSTM, Embedding, Dropout, add
@@ -37,11 +37,11 @@ print('img processing done.')
 '''
 
 
-with open(os.path.join('D:/_AIA_Team_Project_Data/_captioning_save/Flickr8k/VGG16_Flickr8k_Feature.pkl'), 'rb') as f:
+with open(os.path.join('D:\_AIA_Team_Project_Data\Image_Captioning\_save\Flickr8k/VGG16_Flickr8k_Feature.pkl'), 'rb') as f:
     features = pickle.load(f)
     
     
-with open(os.path.join('D:/_AIA_Team_Project_Data/_captioning_data/Flickr8k/captions.txt'), 'r') as f:
+with open(os.path.join('D:\_AIA_Team_Project_Data\Image_Captioning\_data\Flickr8k/captions.txt'), 'r') as f:
     next(f) # 첫줄 빼고 읽어오기
     captions_doc = f.read()
 # print(captions_doc)
@@ -311,7 +311,7 @@ def generate_caption(image_name):
     plt.show()
 '''
 
-image = load_img('C:\AIA_Team_Project\Project\Image_Captioning/caption_test/234.jpg', target_size=(224, 224))
+image = load_img('D:\_AIA_Team_Project_Data\Image_Captioning\_test/0.JPG', target_size=(224, 224))
 # convert image pixels to numpy array
 image = img_to_array(image)
 # reshape data for model
@@ -323,7 +323,7 @@ model = Model(inputs=model.inputs, outputs=model.layers[-2].output)
 predic_features = model.predict(image, verbose=1)
 
 print('prediction..')
-model = load_model('D:/_AIA_Team_Project_Data/_captioning_save/Flickr8k/VGG16_Flickr8k_Model.h5')
+model = load_model('D:\_AIA_Team_Project_Data\Image_Captioning\_save\Flickr8k/VGG16_Flickr8k_Model.h5')
 y_pred = predict_caption(model, predic_features, tokenizer, max_length)
 y_pred = y_pred.replace('start', '')
 y_pred = y_pred.replace('end', '')
