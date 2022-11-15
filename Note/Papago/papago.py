@@ -3,7 +3,7 @@ import json
 
 client_id = "EDRKGEUTuKP5ChgXSiVI" # 개발자센터에서 발급받은 Client ID 값
 client_secret = "GOFsFnv9W6" # 개발자센터에서 발급받은 Client Secret 값
-encText = urllib.parse.quote("We are Teletoby!! hahahaha")
+encText = urllib.parse.quote("Hello, I am Seongjin Moon, a student of AIA Academy. Nice to meet you")
 data = "source=en&target=ko&text=" + encText
 url = "https://openapi.naver.com/v1/papago/n2mt"
 request = urllib.request.Request(url)
