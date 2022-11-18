@@ -7,6 +7,13 @@ import fastai
 import re
 import pickle
 
+# torch : 1.12.1
+# transformers : 4.12.0
+# torch text : 0.6.0
+# fastai : 0.80.0
+# tokenizer : 3.4.1
+# typing_extensions : 4.3.0
+
 tokenizer = PreTrainedTokenizerFast.from_pretrained("skt/kogpt2-base-v2",
   bos_token='</s>', eos_token='</s>', unk_token='<unk>',
   pad_token='<pad>', mask_token='<mask>') 
@@ -25,7 +32,11 @@ class DropOutput(Callback):
   def after_pred(self): self.learn.pred = self.pred[0]
 
 '''
-with open('written_test.txt', encoding='UTF8') as f:
+# with open('written_test.txt', encoding='UTF8') as f:
+#    lines = f.read()
+# lines = " ".join(lines.split())
+
+with open('짧은시.txt', encoding='UTF8') as f:
    lines = f.read()
 lines = " ".join(lines.split())
 
@@ -42,7 +53,7 @@ dls = tls.dataloaders(bs=batch, seq_len=seq_len)
 learn = Learner(dls, model, loss_func=CrossEntropyLossFlat(), cbs=[DropOutput], metrics=Perplexity()).to_fp16()
 lr=learn.lr_find()
 print(lr)
-learn.fine_tune(10)
+learn.fine_tune(30)
 
 pickle.dump(learn, open(os.path.join('D:\study_data\_data/team_project/korean_written/', 'learn.pkl'), 'wb'))
 '''
@@ -50,7 +61,7 @@ pickle.dump(learn, open(os.path.join('D:\study_data\_data/team_project/korean_wr
 with open(os.path.join('D:\study_data\_data/team_project/korean_written/', 'learn.pkl'), 'rb') as f:
   learn = pickle.load(f)
 
-prompt=" 강아지 두 마리 "
+prompt=" 강아지 두 마리가 눈을 달리고 있다 "
 prompt_ids = tokenizer.encode(prompt)
 inp = tensor(prompt_ids)[None].cuda()
 preds = learn.model.generate(inp,

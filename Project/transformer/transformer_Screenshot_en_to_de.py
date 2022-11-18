@@ -20,6 +20,7 @@ def tokenize_en(text):
 def tokenize_de(text):
     return [token.text for token in spacy_de.tokenizer(text)]
 
+
 from torchtext.data import Field, BucketIterator
 
 SRC = Field(tokenize=tokenize_en, init_token="<sos>", eos_token="<eos>", lower=True, batch_first=True)
@@ -63,13 +64,14 @@ for idx, batch in enumerate(test_iterator):
     src = batch.src
     trg = batch.trg
 
-    print(f"첫 번째 배치 크기: {src.shape}")
-
+    print(f"{idx} 번째 batch.shape: {src.shape}")
+    
     # 현재 배치에 있는 하나의 문장에 포함된 정보 출력
-    for i in range(src.shape[1]):
-        print(f"인덱스 {i}: {src[idx][i].item()}")
-
-    break  # 첫번째 배치만 확인
+    # for i in range(src.shape[1]):
+    #     print(f"인덱스 {i}: {src[idx][i].item()}")
+    
+    # if idx==128: 
+    #     break  # 첫번째 배치만 확인
 
 
 class MultiHeadAttentionLayer(nn.Module):
@@ -201,65 +203,48 @@ class EncoderLayer(nn.Module):
 
         # dropout, residual and layer norm
         src = self.ff_layer_norm(src + self.dropout(_src))
-        # 마찬가지로 피드포워드 통과 전 후를 더했으니까 값의 차이가 심할까봐 레이어 노말 한번
         
         # src: [batch_size, src_len, hidden_dim]
 
         return src
     
     
-class Encoder(nn.Module): # 앞의 EncoderLayer를 총 n개의 레이어만큼 겹침
+class Encoder(nn.Module):
     def __init__(self, input_dim, hidden_dim, n_layers, n_heads, pf_dim, dropout_ratio, device, max_length=100):
         super().__init__()
 
         self.device = device
 
-        self.tok_embedding = nn.Embedding(input_dim, hidden_dim) # 들어온 것에 대한 임베딩 (밀집벡터화)
-        self.pos_embedding = nn.Embedding(max_length, hidden_dim) # 전체에 대한 임베딩 (위치값 기억테이블 생성)
+        self.tok_embedding = nn.Embedding(input_dim, hidden_dim) 
+        self.pos_embedding = nn.Embedding(max_length, hidden_dim) 
     
-
         self.layers = nn.ModuleList([EncoderLayer(hidden_dim, n_heads, pf_dim, dropout_ratio, device) for _ in range(n_layers)])
-        # nn.ModuleList : nn.Sequential과 마찬가지로 안에 레이어를 쌓을 수 있음. 하지만 forward()가 없고 안에 담긴 layer 간의 연결도 없다
-        # 그냥 여러개의 레이어를 넣은 클래스를 만드는 것 (토치에서의 module = keras의 layer)
         
         self.dropout = nn.Dropout(dropout_ratio)
-
-        self.scale = torch.sqrt(torch.FloatTensor([hidden_dim])).to(device)
 
     def forward(self, src, src_mask):
 
         # src: [batch_size, src_len]
         # src_mask: [batch_size, src_len]
 
-        batch_size = src.shape[0] # 문장의 개수
-        src_len = src.shape[1] # 각 문장 중 단어가 제일 많은 문장의 단어 개수 (최대길이)
+        batch_size = src.shape[0] # 배치 별 문장의 개수
+        src_len = src.shape[1] # 배치 별 최대 길이
 
         pos = torch.arange(0, src_len).unsqueeze(0).repeat(batch_size, 1).to(self.device)
-        '''>>> torch.arange(5)
-        tensor([ 0,  1,  2,  3,  4])
-        >>> torch.arange(1, 4)
-        tensor([ 1,  2,  3])
-        >>> torch.arange(1, 2.5, 0.5)
-        tensor([ 1.0000,  1.5000,  2.0000])'''
-        # 1. arange(0, src_len): 0 부터 src_len 까지 실수범위
-        # 2. unsqueeze(0): 0번째에 한차원 늘림 (벡터형태니까) -> (1, src_len)
-        # 3. repeat(batch_size, 1): dim=0으로 batch_size만큼 반복, dim=1로 1만큼 반복 -> (batch_size, src_len)
         
         # pos: [batch_size, src_len]
 
-        # 소스 문장의 임베딩과 위치 임베딩을 더한 것을 사용
-        src = self.dropout((self.tok_embedding(src) * self.scale) + self.pos_embedding(pos))
-        # src: [batch_size, src_len, hidden_dim]  각 문장들이 밀집벡터형태로 배치개수만큼 묶여 있음
+        src = self.dropout((self.tok_embedding(src)) + self.pos_embedding(pos))
+        
+        # src: [batch_size, src_len, hidden_dim]  
 
         # 모든 인코더 레이어를 차례대로 거치면서 순전파(forward) 수행
         for layer in self.layers:
             src = layer(src, src_mask)
-        # 실질적으로 레이어 통과 진행시키는 부분
-        # 모듈 리스트로 n개만큼 쌓은 인코더 레이어에 src를 하나씩 통과시키도록 선언해둠
         
         # src: [batch_size, src_len, hidden_dim]
 
-        return src # 마지막 레이어의 출력을 반환
+        return src # 마지막 레이어의 출력 반환
     
     
 class DecoderLayer(nn.Module):
@@ -274,7 +259,6 @@ class DecoderLayer(nn.Module):
         self.positionwise_feedforward = PositionwiseFeedforwardLayer(hidden_dim, pf_dim, dropout_ratio)
         self.dropout = nn.Dropout(dropout_ratio)
 
-    # 인코더의 출력 값(enc_src)을 어텐션(attention)하는 구조
     def forward(self, trg, enc_src, trg_mask, src_mask):
 
         # trg: [batch_size, trg_len, hidden_dim]
@@ -283,17 +267,14 @@ class DecoderLayer(nn.Module):
         # src_mask: [batch_size, src_len]
 
         # self attention
-        # 자기 자신에 대하여 어텐션(attention)
         _trg, _ = self.self_attention(trg, trg, trg, trg_mask)
-        # 키, 쿼리, 밸류 전부 자기 자신 넣음
 
         # dropout, residual connection and layer norm
         trg = self.self_attn_layer_norm(trg + self.dropout(_trg))
         
         # trg: [batch_size, trg_len, hidden_dim]
 
-        # encoder attention
-        # 디코더의 쿼리(Query)를 이용해 인코더를 어텐션(attention)
+        # encoder-decoder attention
         _trg, attention = self.encoder_attention(trg, enc_src, enc_src, src_mask)
         #  자신(디코더)의 쿼리, 인코더의 키, 인코더의 밸류
         
@@ -309,7 +290,6 @@ class DecoderLayer(nn.Module):
         trg = self.ff_layer_norm(trg + self.dropout(_trg))
 
         # trg: [batch_size, trg_len, hidden_dim]
-        # attention: [batch_size, n_heads, trg_len, src_len]
         
         return trg, attention
     
@@ -329,8 +309,6 @@ class Decoder(nn.Module):
 
         self.dropout = nn.Dropout(dropout_ratio)
 
-        self.scale = torch.sqrt(torch.FloatTensor([hidden_dim])).to(device)
-
     def forward(self, trg, enc_src, trg_mask, src_mask):
 
         # trg: [batch_size, trg_len]
@@ -345,21 +323,17 @@ class Decoder(nn.Module):
 
         # pos: [batch_size, trg_len]
 
-        # output embedding + positional encoding
-        trg = self.dropout((self.tok_embedding(trg) * self.scale) + self.pos_embedding(pos))
+        trg = self.dropout((self.tok_embedding(trg)) + self.pos_embedding(pos))
 
         # trg: [batch_size, trg_len, hidden_dim]
 
         for layer in self.layers:
-            # 소스 마스크와 타겟 마스크 모두 사용
             trg, attention = layer(trg, enc_src, trg_mask, src_mask)
 
         # trg: [batch_size, trg_len, hidden_dim]
         # attention: [batch_size, n_heads, trg_len, src_len]
 
-        # output = self.fc_out(trg)
-        output = torch.log_softmax(self.fc_out(trg), dim=-1)    # 그냥 소프트맥스하면 값 a 만 나오고 성능 개구리됨
-        # print(sum(output[0,0,:]))
+        output = torch.log_softmax(self.fc_out(trg), dim=-1) 
         
         # output: [batch_size, trg_len, output_dim]
 
@@ -374,7 +348,6 @@ class Transformer(nn.Module):
         self.trg_pad_idx = trg_pad_idx
         self.device = device
 
-    # 소스 문장(인코더의 문장)의 <pad> 토큰에 대하여 마스크(mask) 값을 0으로 설정
     def make_src_mask(self, src):
 
         # src: [batch_size, src_len]
@@ -385,64 +358,22 @@ class Transformer(nn.Module):
 
         return src_mask
 
-    # 타겟 문장(디코더의 문장)에서 각 단어는 다음 단어가 무엇인지 알 수 없도록(이전 단어만 보도록) 만들기 위해 마스크를 사용
     def make_trg_mask(self, trg):
 
         # trg: [batch_size, trg_len]
-
-        """ (마스크 예시)
-        1 0 0 0 0
-        1 1 0 0 0
-        1 1 1 0 0
-        1 1 1 0 0
-        1 1 1 0 0
-        """
+        
         trg_pad_mask = (trg != self.trg_pad_idx).unsqueeze(1).unsqueeze(2)
-        # 패딩부분 마스크
         
         # trg_pad_mask: [batch_size, 1, 1, trg_len]
 
         trg_len = trg.shape[1]
 
-        """ (마스크 예시)
-        1 0 0 0 0
-        1 1 0 0 0
-        1 1 1 0 0
-        1 1 1 1 0
-        1 1 1 1 1
-        """
         trg_sub_mask = torch.tril(torch.ones((trg_len, trg_len), device = self.device)).bool()
         # 치팅방지 마스크
-        # torch.tril(텐서, diagonal=정수)
-        ''' 3x3 텐서일때
-        diagonal=-1
-        tensor([[0.0000, 0.0000, 0.0000],
-        [1.1507, 0.0000, 0.0000],
-        [0.3187, 1.1888, 0.0000]])
-        .bool() 하면 0자리 False로 채움
-        tensor([[False, False, False],
-        [ True, False, False],
-        [ True,  True, False]])
-        
-        diagonal=0  
-        tensor([[-0.6865,  0.0000,  0.0000],
-        [ 0.2829, -0.7228,  0.0000],
-        [-0.0886, -0.6464, -0.8440]])
-        
-        diagonal=1
-        tensor([[ 1.6846,  0.2727,  0.0000],
-        [-0.2204,  1.1502, -0.6502],
-        [-1.3327, -0.9748, -0.9970]])
-        '''
-        
         
         # trg_sub_mask: [trg_len, trg_len]
 
         trg_mask = trg_pad_mask & trg_sub_mask
-        # 패딩값마스크와 치팅방지마스크를 & 연산자로 붙여서 디코더용 마스크 하나 생성
-        # & 연산자이기 땜에 두 마스크에서 수치가 다 있는 곳만 값을 구하도록 함
-        # 즉 한쪽 마스크만 적용되는 부분도 다 0으로 처리가 가능
-        # & 연산자: 두 값이 같으면 그 값을 뱉고 두 값이 다르면 0 뱉음
 
         # trg_mask: [batch_size, 1, trg_len, trg_len]
 
@@ -479,7 +410,7 @@ ENC_LAYERS = 3      # 인코더 레이어 개수
 DEC_LAYERS = 3      # 디코더 레이어 개수
 ENC_HEADS = 8       # 헤드 개수
 DEC_HEADS = 8
-ENC_PF_DIM = 512    # 포지션 임베딩 차원
+ENC_PF_DIM = 512    
 DEC_PF_DIM = 512
 ENC_DROPOUT = 0.1
 DEC_DROPOUT = 0.1
@@ -520,7 +451,7 @@ criterion = nn.CrossEntropyLoss(ignore_index = TRG_PAD_IDX)
 
 
 # 모델 학습(train) 함수
-def train(model, iterator, optimizer, criterion, clip):
+def train(model, iterator, optimizer, criterion):
     model.train() # 학습 모드
     epoch_loss = 0
 
@@ -531,12 +462,12 @@ def train(model, iterator, optimizer, criterion, clip):
         
         optimizer.zero_grad()
 
-        # 출력 단어의 마지막 인덱스(<eos>)는 제외
+        # 출력 단어의 <eos>는 제외
         # 입력을 할 때는 <sos>부터 시작하도록 처리
         output, _ = model(src, trg[:,:-1])
         
-        # output: [배치 크기, trg_len - 1, output_dim]
-        # trg: [배치 크기, trg_len]
+        # output: [batch_size, trg_len - 1, output_dim]
+        # trg: [batch_size, trg_len]
         # torch.Size([128, 27, 5920])
         # torch.Size([128, 28])
 
@@ -546,22 +477,17 @@ def train(model, iterator, optimizer, criterion, clip):
         # 출력 단어의 인덱스 0(<sos>)은 제외
         trg = trg[:,1:].contiguous().view(-1)
 
-        # output: [배치 크기 * trg_len - 1, output_dim]
-        # trg: [배치 크기 * trg len - 1]
+        # output: [batch_size * trg_len - 1, output_dim]
+        # trg: [batch_size * trg len - 1]
 
         # 모델의 출력 결과와 타겟 문장을 비교하여 손실 계산
         loss = criterion(output, trg)
-        loss.backward() # 기울기(gradient) 계산
-
-        # 기울기(gradient) clipping 진행
-        torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
-        # clip_grad_norm(): 일정 기울기 threshold를 넘기면 잘라서 너무 큰 기울기가 나오지 않도록 조절
-        # threshold는 기울기가 가질 수 있는 최대 L2norm값. 사용자가 정해야함. 기울기/L2norm
+        loss.backward() 
 
         # 파라미터 업데이트
         optimizer.step()
 
-        # 전체 손실 값 계산
+        # 전체 loss 계산
         epoch_loss += loss.item()
 
     return epoch_loss / len(iterator)
@@ -581,8 +507,8 @@ def evaluate(model, iterator, criterion):
             # 입력을 할 때는 <sos>부터 시작하도록 처리
             output, _ = model(src, trg[:,:-1])
             
-            # output: [배치 크기, trg_len - 1, output_dim=vocab_size]
-            # trg: [배치 크기, trg_len]
+            # output: [batch_size, trg_len - 1, output_dim=vocab_size]
+            # trg: [batch_size, trg_len]
 
             output_dim = output.shape[-1]
 
@@ -590,8 +516,8 @@ def evaluate(model, iterator, criterion):
             # 출력 단어의 인덱스 0(<sos>)은 제외
             trg = trg[:,1:].contiguous().view(-1)
 
-            # output: [배치 크기 * trg_len - 1, output_dim]
-            # trg: [배치 크기 * trg len - 1]
+            # output: [batch_size * trg_len - 1, output_dim]
+            # trg: [batch_size * trg len - 1]
 
             # 모델의 출력 결과와 타겟 문장을 비교하여 손실 계산
             loss = criterion(output, trg)
@@ -616,7 +542,7 @@ best_valid_loss = float('inf') # 양의 무한대부터 시작
 for epoch in range(N_EPOCHS):
     start_time = time.time() # 시작 시간 기록
 
-    train_loss = train(model, train_iterator, optimizer, criterion, CLIP)
+    train_loss = train(model, train_iterator, optimizer, criterion)
     valid_loss = evaluate(model, valid_iterator, criterion)
 
     end_time = time.time() # 종료 시간 기록
@@ -624,11 +550,11 @@ for epoch in range(N_EPOCHS):
 
     if valid_loss < best_valid_loss:
         best_valid_loss = valid_loss
-        torch.save(model.state_dict(), 'transformer_german_to_english.pt')
+        # torch.save(model.state_dict(), 'transformer_german_to_english.pt')
 
     print(f'Epoch: {epoch + 1:02} | Time: {epoch_mins}m {epoch_secs}s')
-    print(f'\tTrain Loss: {train_loss:.3f} | Train PPL: {math.exp(train_loss):.3f}')
-    print(f'\tValidation Loss: {valid_loss:.3f} | Validation PPL: {math.exp(valid_loss):.3f}')
+    print(f'\tTrain Loss: {train_loss:.3f}')
+    print(f'\tValidation Loss: {valid_loss:.3f}')
     
     
 # 학습된 모델 저장
@@ -638,7 +564,7 @@ model.load_state_dict(torch.load('transformer_german_to_english.pt'))
 
 test_loss = evaluate(model, test_iterator, criterion)
 
-print(f'Test Loss: {test_loss:.3f} | Test PPL: {math.exp(test_loss):.3f}')
+print(f'Test Loss: {test_loss:.3f}')
 # PPL : 언어모델의 평가 방법. Perplexity. 직역 시 당혹스러운 정도. 낮을 수록 좋다
 # 이전 단어로 다음 단어를 예측할 때 몇 개의 단어 후보를 고려하는지
 # 단, 테스트 데이터가 충분히 많고, 언어 모델을 활용할 도메인에 적합한 테스트 데이터셋으로 구성된 경우에 한함
@@ -665,18 +591,17 @@ test_loss = evaluate(model, test_iterator, criterion)
 
 print(f'Test Loss: {test_loss:.3f} | Test PPL: {math.exp(test_loss):.3f}')
 
-# 번역(translation) 함수
 def translate_sentence(sentence, src_field, trg_field, model, device, max_len=50, logging=True):
     model.eval() # 평가 모드
 
-    if isinstance(sentence, str): # isinstance : sentence 의 자료형이 str 인지 확인. bool 반환
-        nlp = spacy.load('de')
+    if isinstance(sentence, str): 
+        nlp = en_core_web_sm.load()
         tokens = [token.text.lower() for token in nlp(sentence)]
     else:
         tokens = [token.lower() for token in sentence]
 
     # 처음에 <sos> 토큰, 마지막에 <eos> 토큰 붙이기
-    tokens = [src_field.init_token] + tokens + [src_field.eos_token]    # 처음에 Filed 객체로 선언해둠
+    tokens = [src_field.init_token] + tokens + [src_field.eos_token]
     if logging:
         print(f"전체 소스 토큰: {tokens}")
 
@@ -684,10 +609,10 @@ def translate_sentence(sentence, src_field, trg_field, model, device, max_len=50
     if logging:
         print(f"소스 문장 인덱스: {src_indexes}")
 
-    src_tensor = torch.LongTensor(src_indexes).unsqueeze(0).to(device)  # 토치텐서에 실어주기
+    src_tensor = torch.LongTensor(src_indexes).unsqueeze(0).to(device)
 
     # 소스 문장에 따른 마스크 생성
-    src_mask = model.make_src_mask(src_tensor)      # 패딩부분 가리는 용도 마스크 생성
+    src_mask = model.make_src_mask(src_tensor)     
 
     # 인코더(endocer)에 소스 문장을 넣어 출력 값 구하기
     with torch.no_grad():
@@ -696,10 +621,9 @@ def translate_sentence(sentence, src_field, trg_field, model, device, max_len=50
     # 처음에는 <sos> 토큰 하나만 가지고 있도록 하기
     trg_indexes = [trg_field.vocab.stoi[trg_field.init_token]]
 
-    for i in range(max_len): # max_len 만큼 반복해서 단어 뽑기
-        trg_tensor = torch.LongTensor(trg_indexes).unsqueeze(0).to(device)  # 1배치니까
+    for i in range(max_len): # max_len 만큼 반복
+        trg_tensor = torch.LongTensor(trg_indexes).unsqueeze(0).to(device) 
 
-        # 출력 문장에 따른 마스크 생성
         trg_mask = model.make_trg_mask(trg_tensor)
         
         with torch.no_grad():
@@ -709,14 +633,14 @@ def translate_sentence(sentence, src_field, trg_field, model, device, max_len=50
         pred_token = output.argmax(2)[:,-1].item()
         trg_indexes.append(pred_token) # 출력 문장에 더하기
 
-        # <eos>를 만나는 순간 끝
-        if pred_token == trg_field.vocab.stoi[trg_field.eos_token]:     # 현재 predict한 것이 <eos> 라면 끝냄
+        # 현재 predict한 것이 <eos> 라면 끝냄
+        if pred_token == trg_field.vocab.stoi[trg_field.eos_token]:     
             break
 
     # 각 출력 단어 인덱스를 실제 단어로 변환
     trg_tokens = [trg_field.vocab.itos[i] for i in trg_indexes]
 
-    # 첫 번째 <sos>는 제외하고 출력 문장 반환
+    # <sos>는 제외하고 출력 문장 반환
     return trg_tokens[1:], attention
 
 

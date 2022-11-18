@@ -526,7 +526,7 @@ ENC_LAYERS = 4      # 인코더 레이어 개수
 DEC_LAYERS = 4      # 디코더 레이어 개수
 ENC_HEADS = 8       # 헤드 개수
 DEC_HEADS = 8
-ENC_PF_DIM = 512    # 포지션 임베딩 차원
+ENC_PF_DIM = 512   
 DEC_PF_DIM = 512
 ENC_DROPOUT = 0.1
 DEC_DROPOUT = 0.1
@@ -575,7 +575,7 @@ def train(model, iterator, optimizer, criterion, clip):
     for i, batch in enumerate(iterator):
         src = batch.src
         trg = batch.trg
-        
+
         optimizer.zero_grad()
 
         # 출력 단어의 마지막 인덱스(<eos>)는 제외
@@ -655,7 +655,7 @@ def epoch_time(start_time, end_time):
     elapsed_secs = int(elapsed_time - (elapsed_mins * 60))
     return elapsed_mins, elapsed_secs
 
-'''
+# '''
 N_EPOCHS = 10
 CLIP = 1
 best_valid_loss = float('inf') # 양의 무한대부터 시작
