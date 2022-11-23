@@ -428,7 +428,7 @@ pickle.dump(learn, open(os.path.join('D:\study_data\_data/team_project/korean_wr
 with open(os.path.join('D:\study_data\_data/team_project/korean_written/', 'learn2.pkl'), 'rb') as f:
   learn = pickle.load(f)
 
-prompt = re.sub('.', '', user_caption_translated)
+prompt = re.sub('\.', '', user_caption_translated)
 prompt_ids = tokenizer.encode(prompt)
 inp = tensor(prompt_ids)[None].cuda()
 preds = learn.model.generate(inp,
