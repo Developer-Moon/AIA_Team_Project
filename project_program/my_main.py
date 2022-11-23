@@ -1,6 +1,7 @@
 # 가상환경 : project
 
 ''' << Version Notice >>
+python : 3.9.7
 tensorflow : 2.8.2
 torch : 1.13.1
 
@@ -10,6 +11,10 @@ for KoGPT2 versions
     - fastai : 2.7.10
     - tokenizer : 3.4.1
     - typing_extensions : 4.3.0
+
+for stable-diffusion versions
+    - ftfy : 6.1.1
+    - tensorflow_addons : 0.18.0
 '''
 
 import urllib.request
