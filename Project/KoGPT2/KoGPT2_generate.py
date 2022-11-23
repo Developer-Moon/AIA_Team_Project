@@ -145,7 +145,3 @@ for i in range(len(sentences)):
 output = ''.join(output)
 
 print(output)
-
-
-
-

@@ -1,4 +1,19 @@
+# 가상환경 : project
+
+''' << Version Notice >>
+tensorflow : 2.8.2
+torch : 1.13.1
+
+for KoGPT2 versions
+    - transformers : 4.12.0
+    - torch text : 0.6.0
+    - fastai : 0.80.0
+    - tokenizer : 3.4.1
+    - typing_extensions : 4.3.0
+'''
+
 import urllib.request
+import joblib as jb
 import json
 import os
 import pickle
@@ -19,7 +34,14 @@ from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from keras.models import Model, load_model
 from tensorflow.keras.utils import to_categorical
-from keras.layers import Input, Dense, LSTM, Embedding, Dropout, add
+from keras.layers import Input, Dense, LSTM, Embedding, Dropout
+
+from stable_diffusion_tf.stable_diffusion import StableDiffusion
+from PIL import Image
+
+
+####################################################################################################################################
+# captioning
 
 BASE_DIR = 'D:\study_data\_data/team_project\Flickr8k/'
 WORKING_DIR = 'D:\study_data\_data/team_project\Flickr8k\working/'
@@ -66,7 +88,7 @@ print('feature extraction took', end_time-start_time, 'sec.')
 # store features in pickle
 pickle.dump(features, open(os.path.join(WORKING_DIR, 'features.pkl'), 'wb'))
 print('img processing done.')
-'''
+# '''
 
 # load features from pickle
 with open(os.path.join(WORKING_DIR, 'features.pkl'), 'rb') as f:
@@ -220,7 +242,7 @@ outputs = Dense(vocab_size, activation='softmax')(decoder3)
 
 model = Model(inputs=[inputs1, inputs2], outputs=outputs)
 model.compile(loss='categorical_crossentropy', optimizer='adam')
-'''
+# '''
 
 '''
 # train the model
@@ -243,7 +265,7 @@ print(f'epochs: {epochs}    batch size: {batch_size}')
 
 # save the model
 model.save(WORKING_DIR+'/best_model.h5')
-'''
+# '''
 
 def idx_to_word(integer, tokenizer):
     for word, index in tokenizer.word_index.items():
@@ -326,6 +348,7 @@ print("BLEU-2: %f" % corpus_bleu(actual, predicted, weights=(0.5, 0.5, 0, 0)))  
 user_caption = y_pred
 
 ###########################################################################################################################
+# translation
 
 client_id = "EDRKGEUTuKP5ChgXSiVI" # 개발자센터에서 발급받은 Client ID 값
 client_secret = "GOFsFnv9W6" # 개발자센터에서 발급받은 Client Secret 값
@@ -347,16 +370,10 @@ if(rescode==200):
 else:
     print("Error Code:" + rescode)
     
-
 ###########################################################################################################################
+# KoGPT2
 
-# torch : 1.12.1
-# transformers : 4.12.0
-# torch text : 0.6.0
-# fastai : 0.80.0
-# tokenizer : 3.4.1
-# typing_extensions : 4.3.0
-
+# '''
 tokenizer = PreTrainedTokenizerFast.from_pretrained("skt/kogpt2-base-v2",
   bos_token='</s>', eos_token='</s>', unk_token='<unk>',
   pad_token='<pad>', mask_token='<mask>') 
@@ -373,15 +390,17 @@ class TransformersTokenizer(Transform):
 #gpt2 ouput is tuple, we need just one val
 class DropOutput(Callback):
   def after_pred(self): self.learn.pred = self.pred[0]
+# '''
 
-'''
-# with open('written_test.txt', encoding='UTF8') as f:
-#    lines = f.read()
-# lines = " ".join(lines.split())
 
-with open('짧은시.txt', encoding='UTF8') as f:
-   lines = f.read()
+''' << KoGPT2 fine tuning >>
+with open('Project\KoGPT2/짧은시.txt', encoding='UTF8') as f:
+    # lines = f.readlines()
+    lines = f.read()
+
 lines = " ".join(lines.split())
+lines = re.sub('[.,\"\']', '',lines)
+print(len(lines)) # 6655
 
 #split data
 train=lines[:int(len(lines)*0.9)]
@@ -396,16 +415,15 @@ dls = tls.dataloaders(bs=batch, seq_len=seq_len)
 learn = Learner(dls, model, loss_func=CrossEntropyLossFlat(), cbs=[DropOutput], metrics=Perplexity()).to_fp16()
 lr=learn.lr_find()
 print(lr)
-learn.fine_tune(30)
+learn.fine_tune(50)
 
-pickle.dump(learn, open(os.path.join('D:\study_data\_data/team_project/korean_written/', 'learn.pkl'), 'wb'))
-'''
+pickle.dump(learn, open(os.path.join('D:\study_data\_data/team_project/korean_written/', 'learn2.pkl'), 'wb'))
+# '''
 
-with open(os.path.join('D:\study_data\_data/team_project/korean_written/', 'learn.pkl'), 'rb') as f:
+with open(os.path.join('D:\study_data\_data/team_project/korean_written/', 'learn2.pkl'), 'rb') as f:
   learn = pickle.load(f)
 
-# prompt=" 강아지 두 마리가 눈을 달리고 있다 "
-prompt = user_caption_translated
+prompt = re.sub('.', '', user_caption_translated)
 prompt_ids = tokenizer.encode(prompt)
 inp = tensor(prompt_ids)[None].cuda()
 preds = learn.model.generate(inp,
@@ -420,17 +438,86 @@ preds = learn.model.generate(inp,
 generated = tokenizer.decode(preds[0].cpu().numpy())
 print(generated)
 
+jb.dump(generated, 'Project\KoGPT2/generatedtxt.dat')
+generated = jb.load('Project\KoGPT2/generatedtxt.dat')
+
+line = [generated]
+words = line[0].split()
+
+# 한국어 종결어미 맨 마지막 글자 검사 / 최소 LEAST_LEN 단어 이상
+LEAST_LEN = 30
+for i in range(LEAST_LEN, len(words)):
+  if list(words[i])[-1] == '다'\
+    or list(words[i])[-1] == '나'\
+    or list(words[i])[-1] == '군'\
+    or list(words[i])[-1] == '니'\
+    or list(words[i])[-1] == '네'\
+    or list(words[i])[-1] == '마'\
+    or list(words[i])[-1] == '걸'\
+    or list(words[i])[-1] == '래'\
+    \
+    or list(words[i])[-1] == '냐'\
+    or list(words[i])[-1] == '련'\
+    or list(words[i])[-1] == '랴'\
+    or list(words[i])[-1] == '대'\
+    or list(words[i])[-1] == '담'\
+    \
+    or list(words[i])[-1] == '라'\
+    or list(words[i])[-1] == '렴'\
+    or list(words[i])[-1] == '서'\
+    \
+    or list(words[i])[-1] == '아'\
+    or list(words[i])[-1] == '어'\
+    or list(words[i])[-1] == '지'\
+    \
+    or list(words[i])[-1] == '고'\
+    or list(words[i])[-1] == '까'\
+    or list(words[i])[-1] == '며':    
+      endidx = i
+      break
+
+all_words = list(words[:endidx+1])
+
+sentences=[]
+start = 0
+NUM_WORD = 4  # 한줄에 출력할 단어 수
+for i in range(1, len(all_words)+1):
+  if i % NUM_WORD == 0:
+    this = all_words[start:i] + ['\n']   
+    sentences.append(this)
+    start+=NUM_WORD
+    end = i
+if this != all_words[-1]:
+      sentences.append(all_words[end:])
+
+txtoutput = []
+for i in range(len(sentences)):    
+  txtoutput.append(' '.join(sentences[i]))
+  if i == 4:
+        txtoutput = txtoutput + ['\n'] 
+txtoutput = ''.join(txtoutput)
+
+print(txtoutput)
+exit()
 
 ###########################################################################################################################
+# stable diffusion
 
-from stable_diffusion_tf.stable_diffusion import StableDiffusion
-from PIL import Image
+OUT_DIR = 'C:\AIA_Team_Project\project_program/'
+imgfile = OUT_DIR + '/output.png'
+
+def myimshow():
+    if os.path.isfile(imgfile):
+        img = Image.open(OUT_DIR + '/output.png')
+        img.show()
+        exit()
+
+myimshow()
 
 STEPS = 50
 G_SCALE = 7.5
 H, W = 512, 512
 SEED = 999
-OUT_DIR = 'C:\AIA_Team_Project\project_program/'
 
 print('generating image..')
 
@@ -445,3 +532,5 @@ img = generator.generate(
 )
 Image.fromarray(img[0]).save(OUT_DIR + '/output.png')
 print(f"saved at {OUT_DIR}")
+
+myimshow()
