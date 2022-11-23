@@ -91,8 +91,9 @@ generated = jb.load('Project\KoGPT2/generatedtxt.dat')
 line = [generated]
 words = line[0].split()
 
-# 한국어 종결어미 맨 마지막 글자 검사 / 최소 30단어 이상
-for i in range(30, len(words)):
+# 한국어 종결어미 맨 마지막 글자 검사 / 최소 LEAST_LEN 단어 이상
+LEAST_LEN = 30
+for i in range(LEAST_LEN, len(words)):
   if list(words[i])[-1] == '다'\
     or list(words[i])[-1] == '나'\
     or list(words[i])[-1] == '군'\
@@ -122,26 +123,28 @@ for i in range(30, len(words)):
       endidx = i
       break
 
-mysentence = list(words[:endidx+1])
+all_words = list(words[:endidx+1])
 
 sentences=[]
 start = 0
 NUM_WORD = 4  # 한줄에 출력할 단어 수
-for i in range(1, len(mysentence)+1):
+for i in range(1, len(all_words)+1):
   if i % NUM_WORD == 0:
-    this = mysentence[start:i] + ['\n']   
+    this = all_words[start:i] + ['\n']   
     sentences.append(this)
     start+=NUM_WORD
     end = i
+if this != all_words[-1]:
+      sentences.append(all_words[end:])
 
-if this != mysentence[-1]:
-      sentences.append(mysentence[end:])
-
+output = []
 for i in range(len(sentences)):    
-  print(' '.join(sentences[i]), end='')
+  output.append(' '.join(sentences[i]))
+  if i == 4:
+        output = output + ['\n'] 
+output = ''.join(output)
 
-
-
+print(output)
 
 
 
