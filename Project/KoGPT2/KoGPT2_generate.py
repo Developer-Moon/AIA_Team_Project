@@ -13,7 +13,7 @@ import joblib as jb
 # torch : 1.12.1
 # transformers : 4.12.0
 # torch text : 0.6.0
-# fastai : 0.80.0
+# fastai : 2.7.10
 # tokenizer : 3.4.1
 # typing_extensions : 4.3.0
 # gensim : 3.8.3
