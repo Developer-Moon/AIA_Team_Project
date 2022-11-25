@@ -3,7 +3,7 @@ import torch
 import transformers
 from transformers import AutoModelWithLMHead, PreTrainedTokenizerFast
 from fastai.text.all import *
-import fastai
+import fastai # 텐서플로나 pytorch 같은 딥러닝 라이브러리
 import re
 import pickle
 from gensim.summarization.summarizer import summarize
@@ -39,12 +39,12 @@ class DropOutput(Callback):
 
 
 '''
-with open('Project\KoGPT2/짧은시.txt', encoding='UTF8') as f:
+with open('team\KoGPT2\짧은시.txt', encoding='UTF8') as f:
     # lines = f.readlines()
     lines = f.read()
 
 lines = " ".join(lines.split())
-lines = re.sub('[.,\"\']', '',lines)
+lines = re.sub('[\.\"\']', '',lines)
 print(len(lines)) # 6655
 
 #split data
@@ -57,16 +57,18 @@ tls = TfmdLists([train,test], TransformersTokenizer(tokenizer), splits=splits, d
 batch, seq_len = 8, 256
 dls = tls.dataloaders(bs=batch, seq_len=seq_len)
 
-learn = Learner(dls, model, loss_func=CrossEntropyLossFlat(), cbs=[DropOutput], metrics=Perplexity()).to_fp16()
+# compile fit과 비슷함
+learn = Learner(dls, model, loss_func=CrossEntropyLossFlat(), cbs=[DropOutput], metrics=Perplexity()).to_fp32()
+# to_fp16 : mixed-precision training, 부동소수점 방식 loss 사용하겠다는 의미, FP32가 거의 디폴트다
 lr=learn.lr_find()
 print(lr)
 learn.fine_tune(50)
 
-pickle.dump(learn, open(os.path.join('D:\study_data\_data/team_project/korean_written/', 'learn2.pkl'), 'wb'))
+pickle.dump(learn, open(os.path.join('D:\study_data\_data/team_project/korean_written/', 'learn3.pkl'), 'wb'))
 # '''
 
 '''
-with open(os.path.join('D:\study_data\_data/team_project/korean_written/', 'learn2.pkl'), 'rb') as f:
+with open(os.path.join('D:\study_data\_data/team_project/korean_written/', 'learn3.pkl'), 'rb') as f:
   learn = pickle.load(f)
 
 prompt= " 두 강아지 "
@@ -82,14 +84,14 @@ preds = learn.model.generate(inp,
                           ) 
 
 generated = tokenizer.decode(preds[0].cpu().numpy())
-jb.dump(generated, 'Project\KoGPT2/generatedtxt.dat')
+jb.dump(generated, 'team\KoGPT2\generatedtxt.dat')
 # '''
 
-generated = jb.load('Project\KoGPT2/generatedtxt.dat')
+generated = jb.load('team\KoGPT2\generatedtxt.dat')
 # print(generated)
 
-line = [generated]
-words = line[0].split()
+line = [generated]  # 문장 리스트화
+words = line[0].split() # 단어 별로 분리
 
 # 한국어 종결어미 맨 마지막 글자 검사 / 최소 LEAST_LEN 단어 이상
 LEAST_LEN = 30
@@ -119,29 +121,40 @@ for i in range(LEAST_LEN, len(words)):
     \
     or list(words[i])[-1] == '고'\
     or list(words[i])[-1] == '까'\
-    or list(words[i])[-1] == '며':    
+    or list(words[i])[-1] == '며':      
       endidx = i
       break
+# 각 단어를 다시 한글자씩 쪼개 단어 별 마지막 글자를 검사함
+# 종결어미 글자가 일치한다면 그때의 인덱스를 endidx로 저장하고 끝냄
 
 all_words = list(words[:endidx+1])
+# endidx까지 단어만 최종 출력에 사용
 
+
+# 한 행에 NUM_WORD씩 표시하여 시 형태로 출력해주기
 sentences=[]
 start = 0
 NUM_WORD = 4  # 한줄에 출력할 단어 수
 for i in range(1, len(all_words)+1):
   if i % NUM_WORD == 0:
-    this = all_words[start:i] + ['\n']   
+    this = all_words[start:i] + ['\n']   # 지정한 글자 수 다음에 엔터 추가
     sentences.append(this)
     start+=NUM_WORD
     end = i
 if this != all_words[-1]:
-      sentences.append(all_words[end:])
+      sentences.append(all_words[end:])  # 엔터 추가한 단어가 마지막 단어가 아니면 남은 단어도 출력하도록 sentences에 append
 
+# print(sentences)
+# [['두', '강아지', '뜀뛰는', '가슴의', '\n'], ['너가요', '눈물도', '이', '젊은', '\n'], ['나이를', '눈물로야', '보낼', '거냐', '\n'], 
+#  ['나날', '속에서', '오직', '한', '\n'], ['사람의', '이름을', '부르며', '살아온', '\n'], ['그', '누가', '죽어가는가를보다', '풀과', '\n'], 
+#  ['나무', '그리고', '산과', '언덕', '\n'], ['온누리', '위에', '던져놓은', '돌이', '\n'], ['끝없이', '연달아']]
+
+# 엔터 추가된 리스트를 모양 잡아서 1문장짜리 리스트로 만들고 4줄씩 연으로 모양 잡기
 output = []
-for i in range(len(sentences)):    
-  output.append(' '.join(sentences[i]))
-  if i == 4:
-        output = output + ['\n'] 
+for i in range(1, len(sentences)+1):    
+  output.append(' '.join(sentences[i-1]))
+  if i%4==0: output = output + ['\n'] 
 output = ''.join(output)
 
 print(output)
+
