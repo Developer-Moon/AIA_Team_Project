@@ -1,0 +1,17 @@
+Working/best_model.h5
+Working/features.pkl
+Working/features_vgg19.pkl
+_save/
+COCO_features/
+.data/
+transformer_german_to_english.pt
+wd-v1-3-full.ckpt
+_data/test_img.jpg
+stable-diffusion-webui/
+_data/
+data/test_img.jpg
+data/sample_image_fp/test_img.jpg
+data/train/test_img.jpg
+data/val/test_img.jpg
+content/
+captions.csv
