@@ -44,12 +44,22 @@ from keras.layers import Input, Dense, LSTM, Embedding, Dropout
 from stable_diffusion_tf.stable_diffusion import StableDiffusion
 from PIL import Image
 
+CAP_BASE_DIR = 'D:\study_data\_data/team_project\Flickr8k/'
+CAP_WORKING_DIR = 'D:\study_data\_data/team_project\Flickr8k\working/'
+IMG_OUT_DIR = 'C:\AIA_Team_Project\project_program/'
+
+LEAST_LEN = 30  # generated sentence's least length
+MAX_LEN = 128   # generated sentence's max length
+NUM_WORD = 4    # printing length in a line
+
+STEPS = 50      # diffusion steps
+G_SCALE = 7.5   # unconditional guidance scale
+H, W = 512, 512 # image H, W
+SEED = 999      # random seed
 
 ####################################################################################################################################
 # captioning
 
-BASE_DIR = 'D:\study_data\_data/team_project\Flickr8k/'
-WORKING_DIR = 'D:\study_data\_data/team_project\Flickr8k\working/'
 
 '''
 # load vgg16 model
@@ -61,7 +71,7 @@ model = Model(inputs=model.inputs, outputs=model.layers[-2].output)
 
 # extract features from image
 features = {}
-directory = os.path.join(BASE_DIR, 'Images')
+directory = os.path.join(CAP_BASE_DIR, 'Images')
 
 start_time = time.time()
 for img_name in os.listdir(directory):
@@ -91,16 +101,16 @@ print('feature extraction took', end_time-start_time, 'sec.')
 
 
 # store features in pickle
-pickle.dump(features, open(os.path.join(WORKING_DIR, 'features.pkl'), 'wb'))
+pickle.dump(features, open(os.path.join(CAP_WORKING_DIR, 'features.pkl'), 'wb'))
 print('img processing done.')
 # '''
 
 # load features from pickle
-with open(os.path.join(WORKING_DIR, 'features.pkl'), 'rb') as f:
+with open(os.path.join(CAP_WORKING_DIR, 'features.pkl'), 'rb') as f:
     features = pickle.load(f)
     
     
-with open(os.path.join(BASE_DIR, 'captions.txt'), 'r') as f:
+with open(os.path.join(CAP_BASE_DIR, 'captions.txt'), 'r') as f:
     next(f)
     captions_doc = f.read()
 # print(captions_doc)
@@ -269,7 +279,7 @@ print('training took', round(end_time-start_time), 'sec.')
 print(f'epochs: {epochs}    batch size: {batch_size}')
 
 # save the model
-model.save(WORKING_DIR+'/best_model.h5')
+model.save(CAP_WORKING_DIR+'/best_model.h5')
 # '''
 
 def idx_to_word(integer, tokenizer):
@@ -319,8 +329,8 @@ model = Model(inputs=model.inputs, outputs=model.layers[-2].output)
 predic_features = model.predict(image, verbose=1)
 
 print('prediction..')
-# model = load_model(WORKING_DIR+'/best_model.h5')
-model = load_model(WORKING_DIR+'/best_model.h5')
+# model = load_model(CAP_WORKING_DIR+'/best_model.h5')
+model = load_model(CAP_WORKING_DIR+'/best_model.h5')
 y_pred = predict_caption(model, predic_features, tokenizer, max_length)
 y_pred = y_pred.replace('startseq', '')
 y_pred = y_pred.replace('endseq', '')
@@ -404,7 +414,7 @@ with open('Project\KoGPT2/짧은시.txt', encoding='UTF8') as f:
     lines = f.read()
 
 lines = " ".join(lines.split())
-lines = re.sub('[.,\"\']', '',lines)
+lines = re.sub('[\.\,\"\']', '',lines)
 print(len(lines)) # 6655
 
 #split data
@@ -432,7 +442,7 @@ prompt = re.sub('\.', '', user_caption_translated)
 prompt_ids = tokenizer.encode(prompt)
 inp = tensor(prompt_ids)[None].cuda()
 preds = learn.model.generate(inp,
-                           max_length=128,
+                           max_length=MAX_LEN,
                            pad_token_id=tokenizer.pad_token_id,
                            eos_token_id=tokenizer.eos_token_id,
                            bos_token_id=tokenizer.bos_token_id,
@@ -450,7 +460,6 @@ line = [generated]
 words = line[0].split()
 
 # 한국어 종결어미 맨 마지막 글자 검사 / 최소 LEAST_LEN 단어 이상
-LEAST_LEN = 30
 for i in range(LEAST_LEN, len(words)):
   if list(words[i])[-1] == '다'\
     or list(words[i])[-1] == '나'\
@@ -485,7 +494,6 @@ all_words = list(words[:endidx+1])
 
 sentences=[]
 start = 0
-NUM_WORD = 4  # 한줄에 출력할 단어 수
 for i in range(1, len(all_words)+1):
   if i % NUM_WORD == 0:
     this = all_words[start:i] + ['\n']   
@@ -496,33 +504,27 @@ if this != all_words[-1]:
       sentences.append(all_words[end:])
 
 txtoutput = []
-for i in range(len(sentences)):    
+for i in range(1, len(sentences)+1):    
   txtoutput.append(' '.join(sentences[i]))
-  if i == 4:
-        txtoutput = txtoutput + ['\n'] 
+  if i%4==0: txtoutput = txtoutput + ['\n'] 
 txtoutput = ''.join(txtoutput)
 
 print(txtoutput)
-exit()
 
 ###########################################################################################################################
 # stable diffusion
 
-OUT_DIR = 'C:\AIA_Team_Project\project_program/'
-imgfile = OUT_DIR + '/output.png'
+imgfile = IMG_OUT_DIR + '/output.png'
 
 def myimshow():
     if os.path.isfile(imgfile):
-        img = Image.open(OUT_DIR + '/output.png')
+        img = Image.open(IMG_OUT_DIR + '/output.png')
         img.show()
         exit()
 
 myimshow()
 
-STEPS = 50
-G_SCALE = 7.5
-H, W = 512, 512
-SEED = 999
+
 
 print('generating image..')
 
@@ -535,7 +537,7 @@ img = generator.generate(
     batch_size=1,
     seed=SEED,
 )
-Image.fromarray(img[0]).save(OUT_DIR + '/output.png')
-print(f"saved at {OUT_DIR}")
+Image.fromarray(img[0]).save(IMG_OUT_DIR + '/output.png')
+print(f"saved at {IMG_OUT_DIR}")
 
 myimshow()
