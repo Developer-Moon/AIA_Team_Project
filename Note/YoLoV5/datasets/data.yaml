@@ -1,0 +1,7 @@
+names:
+- handgun
+- rifle
+nc: 2
+train: C:\home\YoLoV5\datasets/train.txt
+val: C:\home\YoLoV5\datasets/valid.txt
+valid: C:\home\YoLoV5\datasets/valid.txt
